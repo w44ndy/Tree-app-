@@ -36,9 +36,9 @@ App for Wilson Contractors managing Christmas trees — from pallets collected a
 ## Completed Features
 - JWT Authentication & Admin seeding
 - Wilson Contractors branding throughout
-- Dashboard with analytics (7-day requirements, stock charts, hauler stats)
-- TV Dashboard — fullscreen dark-themed page for office TV (auto-refresh 30s, no sidebar)
-- Field Page — tap interface for inbound pallets
+- Dashboard with analytics (7-day requirements, stock charts, hauler stats, **field status**)
+- TV Dashboard — fullscreen dark-themed page for office TV (auto-refresh 30s, no sidebar, **field status**)
+- Field Page — tap interface for inbound pallets + **Field Status** (mark pallets ready, full load flag at 10)
 - Stock Page — manage colours and quantities
 - Collections Page — scheduling, inline driver signatures, haulers CRUD, edit/delete
 - Manifest Page — printable with driver info, signature, check-off boxes
