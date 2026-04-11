@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { getLoads, createLoad, updateLoad, getManifest, getColours } from '../lib/api';
+import { getLoads, createLoad, updateLoad, getColours } from '../lib/api';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
-import { Plus, Trash2, Printer, Truck, MapPin, Calendar, Building2, CheckCircle, AlertTriangle, XCircle, Package, ExternalLink } from 'lucide-react';
+import { Plus, Trash2, Truck, MapPin, Calendar, Building2, CheckCircle, AlertTriangle, XCircle, Package, ClipboardCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function LoadsPage() {
@@ -14,9 +13,6 @@ export default function LoadsPage() {
   const [colours, setColours] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
-  const [showManifest, setShowManifest] = useState(null);
-  const [manifestData, setManifestData] = useState(null);
-  const [showAssign, setShowAssign] = useState(null);
   const [form, setForm] = useState({
     company_name: '', driver_name: '', registration: '',
     collection_date: '', destinations: [{ address: '' }],
@@ -91,37 +87,6 @@ export default function LoadsPage() {
       fetchData();
     } catch (err) {
       toast.error('Failed to create');
-    }
-  };
-
-  const handleAssignStock = async (load) => {
-    // Deduct stock for this collection and mark as assigned
-    try {
-      await updateLoad(load.id, { status: 'in_transit' });
-      toast.success('Stock assigned and collection dispatched');
-      fetchData();
-    } catch (err) {
-      toast.error('Failed to assign stock');
-    }
-  };
-
-  const handleStatusChange = async (loadId, status) => {
-    try {
-      await updateLoad(loadId, { status });
-      toast.success(`Status: ${status.replace('_', ' ')}`);
-      fetchData();
-    } catch (err) {
-      toast.error('Failed to update');
-    }
-  };
-
-  const handleShowManifest = async (loadId) => {
-    try {
-      const { data } = await getManifest(loadId);
-      setManifestData(data);
-      setShowManifest(loadId);
-    } catch (err) {
-      toast.error('Failed to get manifest');
     }
   };
 
@@ -290,27 +255,16 @@ export default function LoadsPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    {load.status === 'loading' && check.status === 'can_fulfill' && (
-                      <Button size="sm" onClick={() => handleAssignStock(load)} className="bg-emerald-600 text-white hover:bg-emerald-700" data-testid={`assign-${load.id}`}>
-                        <Package className="w-3 h-3 mr-1" /> Assign & Dispatch
-                      </Button>
-                    )}
-                    {load.status === 'loading' && check.status !== 'can_fulfill' && (
-                      <Button size="sm" variant="outline" onClick={() => handleAssignStock(load)} className="border-amber-300 text-amber-700" data-testid={`force-assign-${load.id}`}>
-                        Force Dispatch
+                    {load.status === 'loading' && (
+                      <Button size="sm" onClick={() => window.location.href = `/manifest/${load.id}`} className="bg-[#1A4331] text-white hover:bg-[#1A4331]/90" data-testid={`dispatch-${load.id}`}>
+                        <ClipboardCheck className="w-3 h-3 mr-1" /> Ready for Dispatch
                       </Button>
                     )}
                     {load.status === 'in_transit' && (
-                      <Button size="sm" variant="outline" onClick={() => handleStatusChange(load.id, 'delivered')} className="border-emerald-300 text-emerald-700">
-                        Mark Delivered
-                      </Button>
+                      <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                        <CheckCircle className="w-3 h-3" /> Dispatched
+                      </span>
                     )}
-                    <Button variant="ghost" size="sm" onClick={() => window.open(`/manifest/${load.id}`, '_blank')} data-testid={`manifest-${load.id}`}>
-                      <Printer className="w-4 h-4 text-[#1A4331]" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/manifest/${load.id}`); toast.success('Manifest link copied — send to driver'); }} title="Copy link for driver" data-testid={`share-${load.id}`}>
-                      <ExternalLink className="w-4 h-4 text-[#4A5D53]" />
-                    </Button>
                   </div>
                 </div>
               </div>
@@ -319,58 +273,6 @@ export default function LoadsPage() {
         )}
       </div>
 
-      {/* Manifest Dialog */}
-      <Dialog open={!!showManifest} onOpenChange={() => { setShowManifest(null); setManifestData(null); }}>
-        <DialogContent className="sm:max-w-2xl" data-testid="manifest-dialog">
-          <DialogHeader><DialogTitle className="font-['Outfit']">Collection Manifest</DialogTitle></DialogHeader>
-          {manifestData && (
-            <div className="mt-4 space-y-4">
-              <div className="flex items-center gap-3 border-b border-[#1A4331]/10 pb-4">
-                <img src="https://customer-assets.emergentagent.com/job_tree-logistics/artifacts/7lohxwsd_2025Logo.png" alt="Wilson Contractors" className="h-10 object-contain" />
-                <div>
-                  <h2 className="text-xl font-bold font-['Outfit'] text-[#0A1711]">Wilson Contractors</h2>
-                  <p className="text-sm text-[#4A5D53]">TMS — Collection Manifest</p>
-                </div>
-              </div>
-              <div className="bg-[#F4F1ED] p-3 rounded-lg">
-                <p className="text-sm"><strong>Company / Driver:</strong> {manifestData.load.driver_name || '—'}</p>
-                <p className="text-sm"><strong>Date:</strong> {manifestData.load.departure_date || '—'}</p>
-                <p className="text-sm"><strong>Status:</strong> {manifestData.load.status}</p>
-              </div>
-              <div>
-                <h4 className="text-sm font-semibold mb-2">Destination(s)</h4>
-                {manifestData.load.destinations?.map((d, i) => (
-                  <div key={i} className="flex items-center gap-2 py-1">
-                    <span className="text-xs bg-[#1A4331] text-white rounded-full w-5 h-5 flex items-center justify-center">{i + 1}</span>
-                    <span className="text-sm">{d.address}</span>
-                  </div>
-                ))}
-              </div>
-              <div>
-                <h4 className="text-sm font-semibold mb-2">Pallets Required</h4>
-                <Table>
-                  <TableHeader>
-                    <TableRow><TableHead>Colour</TableHead><TableHead>Pallets</TableHead><TableHead>Trees</TableHead></TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {(manifestData.load.pallets_required || []).map((p, i) => (
-                      <TableRow key={i}>
-                        <TableCell><span className={`color-badge ${p.color}`}>{p.color}</span></TableCell>
-                        <TableCell className="font-medium">{p.quantity}</TableCell>
-                        <TableCell>{(p.quantity || 0) * 100}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              {manifestData.load.notes && (
-                <div className="bg-[#F4F1ED] p-3 rounded-lg"><p className="text-sm"><strong>Notes:</strong> {manifestData.load.notes}</p></div>
-              )}
-              <Button onClick={() => window.print()} className="bg-[#1A4331] text-white no-print"><Printer className="w-4 h-4 mr-2" /> Print Manifest</Button>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
