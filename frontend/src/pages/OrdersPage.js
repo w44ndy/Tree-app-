@@ -10,7 +10,6 @@ import { Plus, Trash2, CheckCircle, XCircle, ClipboardList, Search } from 'lucid
 import { toast } from 'sonner';
 
 const COLORS = ['green', 'blue', 'silver'];
-const SIZES = ['4ft', '5ft', '6ft', '7ft', '8ft', '10ft'];
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState([]);
@@ -21,7 +20,7 @@ export default function OrdersPage() {
   const [filterStatus, setFilterStatus] = useState('');
   const [form, setForm] = useState({
     customer_name: '', delivery_address: '', contact_phone: '',
-    items: [{ tree_color: 'green', tree_size: '6ft', quantity: 10 }],
+    items: [{ tree_color: 'green', quantity: 10 }],
     delivery_date: '', notes: ''
   });
 
@@ -41,7 +40,7 @@ export default function OrdersPage() {
 
   useEffect(() => { fetchOrders(); }, [filterStatus]);
 
-  const addItem = () => setForm({...form, items: [...form.items, { tree_color: 'green', tree_size: '6ft', quantity: 10 }]});
+  const addItem = () => setForm({...form, items: [...form.items, { tree_color: 'green', quantity: 10 }]});
   const removeItem = (idx) => setForm({...form, items: form.items.filter((_, i) => i !== idx)});
   const updateItem = (idx, field, val) => {
     const items = [...form.items];
@@ -148,16 +147,7 @@ export default function OrdersPage() {
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="flex-1">
-                        <span className="text-xs text-[#4A5D53]">Size</span>
-                        <Select value={item.tree_size} onValueChange={v => updateItem(idx, 'tree_size', v)}>
-                          <SelectTrigger className="bg-white"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {SIZES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="w-20">
+                      <div className="w-24">
                         <span className="text-xs text-[#4A5D53]">Qty</span>
                         <Input type="number" value={item.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)} className="bg-white" />
                       </div>

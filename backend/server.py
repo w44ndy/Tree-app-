@@ -470,65 +470,29 @@ async def update_load(load_id: str, update: LoadUpdate, user=Depends(get_current
     load = await db.loads.find_one({"_id": ObjectId(load_id)})
     return serialize_doc(load)
 
-@api_router.post("/loads/{load_id}/add-pallet")
-async def add_pallet_to_load(load_id: str, pallet: LoadPallet, user=Depends(get_current_user)):
-    load = await db.loads.find_one({"_id": ObjectId(load_id)})
-    if not load:
-        raise HTTPException(status_code=404, detail="Load not found")
-    pallets = load.get("pallets", [])
-    pallets.append(pallet.model_dump())
-    await db.loads.update_one({"_id": ObjectId(load_id)}, {"$set": {"pallets": pallets}})
-    await db.pallets.update_one({"_id": ObjectId(pallet.pallet_id)}, {"$set": {"status": "loading", "location": "lorry"}})
-    load = await db.loads.find_one({"_id": ObjectId(load_id)})
-    return serialize_doc(load)
-
-@api_router.post("/loads/{load_id}/remove-pallet")
-async def remove_pallet_from_load(load_id: str, pallet_id: str, user=Depends(get_current_user)):
-    load = await db.loads.find_one({"_id": ObjectId(load_id)})
-    if not load:
-        raise HTTPException(status_code=404, detail="Load not found")
-    pallets = [p for p in load.get("pallets", []) if p["pallet_id"] != pallet_id]
-    await db.loads.update_one({"_id": ObjectId(load_id)}, {"$set": {"pallets": pallets}})
-    await db.pallets.update_one({"_id": ObjectId(pallet_id)}, {"$set": {"status": "in_yard", "location": "yard"}})
-    load = await db.loads.find_one({"_id": ObjectId(load_id)})
-    return serialize_doc(load)
-
 # ── Dashboard Stats ──────────────────────────────────────────
 @api_router.get("/dashboard/stats")
 async def dashboard_stats(user=Depends(get_current_user)):
-    total_pallets = await db.pallets.count_documents({})
-    in_yard = await db.pallets.count_documents({"status": "in_yard"})
-    in_field = await db.pallets.count_documents({"status": "in_field"})
-    loaded = await db.pallets.count_documents({"status": {"$in": ["loaded", "loading"]}})
-    delivered = await db.pallets.count_documents({"status": "delivered"})
-
+    colours = await db.colours.find().to_list(50)
+    total_pallets = sum(c.get("quantity", 0) for c in colours)
     pending_orders = await db.orders.count_documents({"status": "pending"})
     active_loads = await db.loads.count_documents({"status": {"$in": ["loading", "in_transit"]}})
     total_lorries = await db.lorries.count_documents({})
     available_lorries = await db.lorries.count_documents({"status": "available"})
-
-    # Stock by color
-    color_pipeline = [
-        {"$match": {"status": {"$in": ["in_yard", "in_field"]}}},
-        {"$group": {"_id": "$tree_color", "total_quantity": {"$sum": "$quantity"}, "pallet_count": {"$sum": 1}}}
-    ]
-    color_stock = await db.pallets.aggregate(color_pipeline).to_list(20)
-
-    # Total trees in stock
-    total_trees = sum(c["total_quantity"] for c in color_stock)
+    total_movements = await db.stock_movements.count_documents({})
 
     return {
         "total_pallets": total_pallets,
-        "in_yard": in_yard,
-        "in_field": in_field,
-        "loaded": loaded,
-        "delivered": delivered,
+        "in_yard": total_pallets,
+        "in_field": 0,
+        "loaded": 0,
+        "delivered": 0,
         "pending_orders": pending_orders,
         "active_loads": active_loads,
         "total_lorries": total_lorries,
         "available_lorries": available_lorries,
-        "total_trees": total_trees,
-        "stock_by_color": [{"color": c["_id"], "quantity": c["total_quantity"], "pallets": c["pallet_count"]} for c in color_stock]
+        "total_trees": total_pallets,
+        "stock_by_color": [{"color": c.get("color",""), "quantity": c.get("quantity",0), "pallets": c.get("quantity",0)} for c in colours]
     }
 
 # ── Manifest ─────────────────────────────────────────────────
@@ -538,15 +502,7 @@ async def get_manifest(load_id: str, user=Depends(get_current_user)):
     if not load:
         raise HTTPException(status_code=404, detail="Load not found")
     load_data = serialize_doc(load)
-    # Enrich pallet data
-    enriched_pallets = []
-    for p in load_data.get("pallets", []):
-        pallet = await db.pallets.find_one({"_id": ObjectId(p["pallet_id"])})
-        if pallet:
-            pd = serialize_doc(pallet)
-            pd["position"] = p["position"]
-            enriched_pallets.append(pd)
-    # Get lorry info
+    enriched_pallets = load_data.get("pallets", [])
     lorry = None
     if load_data.get("lorry_id"):
         lorry_doc = await db.lorries.find_one({"_id": ObjectId(load_data["lorry_id"])})
@@ -563,7 +519,6 @@ async def root():
 @app.on_event("startup")
 async def startup():
     await db.users.create_index("email", unique=True)
-    # Seed admin
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@wilsoncontractors.co.uk")
     admin_password = os.environ.get("ADMIN_PASSWORD", "Wilson2026!")
     existing = await db.users.find_one({"email": admin_email})
@@ -579,36 +534,6 @@ async def startup():
     elif not verify_password(admin_password, existing["password_hash"]):
         await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_password(admin_password)}})
         logger.info("Admin password updated")
-    # Write credentials
-    Path("/app/memory").mkdir(exist_ok=True)
-    with open("/app/memory/test_credentials.md", "w") as f:
-        f.write(f"# Test Credentials\n\n## Admin\n- Email: {admin_email}\n- Password: {admin_password}\n- Role: admin\n\n## Auth Endpoints\n- POST /api/auth/login\n- POST /api/auth/register\n- GET /api/auth/me\n- POST /api/auth/logout\n")
-
-app.include_router(api_router)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[os.environ.get("FRONTEND_URL", "http://localhost:3000")],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    client.close()
-sers.insert_one({
-            "email": admin_email,
-            "password_hash": hash_password(admin_password),
-            "name": "Admin",
-            "role": "admin",
-            "created_at": datetime.now(timezone.utc).isoformat()
-        })
-        logger.info(f"Admin user seeded: {admin_email}")
-    elif not verify_password(admin_password, existing["password_hash"]):
-        await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_password(admin_password)}})
-        logger.info("Admin password updated")
-    # Write credentials
     Path("/app/memory").mkdir(exist_ok=True)
     with open("/app/memory/test_credentials.md", "w") as f:
         f.write(f"# Test Credentials\n\n## Admin\n- Email: {admin_email}\n- Password: {admin_password}\n- Role: admin\n\n## Auth Endpoints\n- POST /api/auth/login\n- POST /api/auth/register\n- GET /api/auth/me\n- POST /api/auth/logout\n")

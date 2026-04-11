@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getYardLocations, createYardLocation, deleteYardLocation, getPallets } from '../lib/api';
+import { getYardLocations, createYardLocation, deleteYardLocation, getColours } from '../lib/api';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -11,7 +11,7 @@ const COLOR_BG = { green: 'bg-emerald-500', blue: 'bg-blue-500', silver: 'bg-gra
 
 export default function YardPage() {
   const [locations, setLocations] = useState([]);
-  const [pallets, setPallets] = useState([]);
+  const [colours, setColours] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ name: '', section: 'A', capacity: 20, description: '' });
@@ -19,9 +19,9 @@ export default function YardPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [locRes, palRes] = await Promise.all([getYardLocations(), getPallets({ status: 'in_yard' })]);
+      const [locRes, colRes] = await Promise.all([getYardLocations(), getColours()]);
       setLocations(locRes.data);
-      setPallets(palRes.data);
+      setColours(colRes.data);
     } catch (err) {
       toast.error('Failed to fetch yard data');
     } finally {
@@ -53,13 +53,10 @@ export default function YardPage() {
     }
   };
 
-  // Group pallets by color for overview
+  // Use colours for overview
   const colorSummary = {};
-  pallets.forEach(p => {
-    const key = p.tree_color || 'unknown';
-    if (!colorSummary[key]) colorSummary[key] = { count: 0, quantity: 0 };
-    colorSummary[key].count += 1;
-    colorSummary[key].quantity += p.quantity || 0;
+  colours.forEach(c => {
+    colorSummary[c.color] = { count: c.quantity || 0, quantity: c.quantity || 0 };
   });
 
   return (

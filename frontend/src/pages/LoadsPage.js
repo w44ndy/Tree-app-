@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getLoads, createLoad, updateLoad, getManifest, getLorries, getPallets, addPalletToLoad } from '../lib/api';
+import { getLoads, createLoad, updateLoad, getManifest, getLorries, getColours, addPalletToLoad } from '../lib/api';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -30,12 +30,12 @@ export default function LoadsPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [loadRes, lorryRes, palletRes] = await Promise.all([
-        getLoads(), getLorries(), getPallets({ status: 'in_yard' })
+      const [loadRes, lorryRes, colourRes] = await Promise.all([
+        getLoads(), getLorries(), getColours()
       ]);
       setLoads(loadRes.data);
       setLorries(lorryRes.data);
-      setPallets(palletRes.data);
+      setColours(colourRes.data);
     } catch (err) {
       toast.error('Failed to fetch loads data');
     } finally {
@@ -66,20 +66,20 @@ export default function LoadsPage() {
   };
 
   const handleAddPallet = async (loadId, position) => {
-    if (!selectedPallet) {
-      toast.error('Select a pallet first');
+    if (!selectedColour) {
+      toast.error('Select a colour first');
       return;
     }
     try {
-      await addPalletToLoad(loadId, { pallet_id: selectedPallet, position });
-      toast.success(`Pallet added to position ${position}`);
-      setSelectedPallet('');
+      await addPalletToLoad(loadId, { color: selectedColour, quantity: loadQty, position });
+      toast.success(`${loadQty}x ${selectedColour} added to ${position}`);
+      setSelectedColour('');
+      setLoadQty(1);
       fetchData();
-      // Refresh the loading view
       const { data } = await getManifest(loadId);
       setManifestData(data);
     } catch (err) {
-      toast.error('Failed to add pallet');
+      toast.error(err.response?.data?.detail || 'Failed to add');
     }
   };
 
@@ -257,19 +257,25 @@ export default function LoadsPage() {
             <DialogTitle className="font-['Outfit']">Lorry Loading Map</DialogTitle>
           </DialogHeader>
           <div className="mt-4">
-            {/* Pallet selector */}
+            {/* Colour + Qty selector */}
             <div className="flex items-center gap-3 mb-4">
-              <Label className="whitespace-nowrap">Select Pallet:</Label>
-              <Select value={selectedPallet} onValueChange={setSelectedPallet}>
-                <SelectTrigger className="flex-1" data-testid="select-pallet-for-load"><SelectValue placeholder="Choose pallet to place" /></SelectTrigger>
-                <SelectContent>
-                  {pallets.map(p => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.pallet_number} — {p.tree_color} {p.tree_size} (qty: {p.quantity})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex-1">
+                <Label className="whitespace-nowrap">Colour:</Label>
+                <Select value={selectedColour} onValueChange={setSelectedColour}>
+                  <SelectTrigger data-testid="select-colour-for-load"><SelectValue placeholder="Choose colour" /></SelectTrigger>
+                  <SelectContent>
+                    {colours.filter(c => c.quantity > 0).map(c => (
+                      <SelectItem key={c.color} value={c.color}>
+                        {c.label || c.color} (stock: {c.quantity})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-24">
+                <Label>Qty:</Label>
+                <Input type="number" min={1} value={loadQty} onChange={e => setLoadQty(parseInt(e.target.value) || 1)} data-testid="load-qty-input" />
+              </div>
             </div>
 
             {/* Grid */}
@@ -292,8 +298,8 @@ export default function LoadsPage() {
                       >
                         {loaded ? (
                           <div className="text-center p-1">
-                            <span className={`color-badge ${loaded.tree_color} text-[10px]`}>{loaded.tree_color}</span>
-                            <p className="text-[10px] mt-0.5">{loaded.pallet_number}</p>
+                            <span className={`color-badge ${loaded.color} text-[10px]`}>{loaded.color}</span>
+                            <p className="text-[10px] mt-0.5">x{loaded.quantity}</p>
                           </div>
                         ) : (
                           <span className="text-[#4A5D53]/40">{pos}</span>
@@ -350,9 +356,7 @@ export default function LoadsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Pallet #</TableHead>
                       <TableHead>Colour</TableHead>
-                      <TableHead>Size</TableHead>
                       <TableHead>Qty</TableHead>
                       <TableHead>Position</TableHead>
                     </TableRow>
@@ -360,9 +364,7 @@ export default function LoadsPage() {
                   <TableBody>
                     {manifestData.pallets?.map((p, i) => (
                       <TableRow key={i}>
-                        <TableCell>{p.pallet_number}</TableCell>
-                        <TableCell><span className={`color-badge ${p.tree_color}`}>{p.tree_color}</span></TableCell>
-                        <TableCell>{p.tree_size}</TableCell>
+                        <TableCell><span className={`color-badge ${p.color}`}>{p.color}</span></TableCell>
                         <TableCell>{p.quantity}</TableCell>
                         <TableCell>{p.position}</TableCell>
                       </TableRow>
