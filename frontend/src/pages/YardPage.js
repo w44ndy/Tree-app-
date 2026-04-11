@@ -6,7 +6,7 @@ import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Plus, Trash2, MapPin, Package, X, RotateCw, TreePine, TruckIcon } from 'lucide-react';
 import { toast } from 'sonner';
-import { MapContainer, TileLayer, Polygon, useMapEvents, useMap, Marker } from 'react-leaflet';
+import { MapContainer, TileLayer, Polygon, useMap, Marker } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -50,40 +50,102 @@ function makeRotatedRect(center, width, height, angleDeg) {
 function DrawPolygonTool({ isDrawing, onPolygonDrawn, onCancel }) {
   const [points, setPoints] = useState([]);
   const map = useMap();
+  const pointsRef = useRef([]);
+
+  // Keep ref in sync
+  useEffect(() => { pointsRef.current = points; }, [points]);
 
   useEffect(() => {
+    if (!map) return;
+
+    const container = map.getContainer();
+
     if (isDrawing) {
+      // Disable ALL map interactions
       map.dragging.disable();
-      map.getContainer().style.cursor = 'crosshair';
+      map.touchZoom.disable();
+      map.doubleClickZoom.disable();
+      map.scrollWheelZoom.disable();
+      map.boxZoom.disable();
+      if (map.tap) map.tap.disable();
+      container.style.cursor = 'crosshair';
+
+      // Direct touch/click handler on the map container
+      const handleTap = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Get coordinates from touch or mouse
+        let clientX, clientY;
+        if (e.touches && e.touches.length > 0) {
+          clientX = e.touches[0].clientX;
+          clientY = e.touches[0].clientY;
+        } else if (e.changedTouches && e.changedTouches.length > 0) {
+          clientX = e.changedTouches[0].clientX;
+          clientY = e.changedTouches[0].clientY;
+        } else {
+          clientX = e.clientX;
+          clientY = e.clientY;
+        }
+
+        // Convert screen coords to map latlng
+        const rect = container.getBoundingClientRect();
+        const point = L.point(clientX - rect.left, clientY - rect.top);
+        const latlng = map.containerPointToLatLng(point);
+
+        const current = [...pointsRef.current, [latlng.lat, latlng.lng]];
+        pointsRef.current = current;
+        setPoints([...current]);
+
+        if (current.length >= 4) {
+          onPolygonDrawn(current);
+          pointsRef.current = [];
+          setPoints([]);
+        }
+      };
+
+      // Use touchend for iPad/iPhone, click for desktop
+      container.addEventListener('touchend', handleTap, { passive: false });
+      container.addEventListener('click', handleTap);
+
+      return () => {
+        container.removeEventListener('touchend', handleTap);
+        container.removeEventListener('click', handleTap);
+        map.dragging.enable();
+        map.touchZoom.enable();
+        map.doubleClickZoom.enable();
+        map.scrollWheelZoom.enable();
+        map.boxZoom.enable();
+        if (map.tap) map.tap.enable();
+        container.style.cursor = '';
+      };
     } else {
       map.dragging.enable();
-      map.getContainer().style.cursor = '';
+      map.touchZoom.enable();
+      map.doubleClickZoom.enable();
+      map.scrollWheelZoom.enable();
+      map.boxZoom.enable();
+      if (map.tap) map.tap.enable();
+      container.style.cursor = '';
+      pointsRef.current = [];
       setPoints([]);
     }
-    return () => {
-      map.dragging.enable();
-      map.getContainer().style.cursor = '';
-    };
-  }, [isDrawing, map]);
-
-  useMapEvents({
-    click(e) {
-      if (!isDrawing) return;
-      const newPoints = [...points, [e.latlng.lat, e.latlng.lng]];
-      setPoints(newPoints);
-      // Auto-close at 4 points (rectangle)
-      if (newPoints.length >= 4) {
-        onPolygonDrawn(newPoints);
-        setPoints([]);
-      }
-    }
-  });
+  }, [isDrawing, map, onPolygonDrawn]);
 
   if (!isDrawing || points.length === 0) return null;
 
-  // Show the polygon being drawn
   if (points.length >= 2) {
     return <Polygon positions={points} pathOptions={{ color: '#1A4331', weight: 2, fillOpacity: 0.2, dashArray: '6,4' }} />;
+  }
+  // Show markers for single point
+  if (points.length === 1) {
+    const icon = L.divIcon({
+      className: 'draw-point',
+      html: '<div style="width:12px;height:12px;background:#1A4331;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3);"></div>',
+      iconSize: [12, 12],
+      iconAnchor: [6, 6],
+    });
+    return <Marker position={points[0]} icon={icon} />;
   }
   return null;
 }
@@ -264,7 +326,7 @@ export default function YardPage() {
 
       {isDrawing && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
-          <strong>Drawing mode:</strong> Click 4 corners on the map to outline your bay. The shape will close automatically. Bays can be any angle — just click the corners as they are on the ground.
+          <strong>Drawing mode active:</strong> Tap 4 corners on the map to outline your bay. The shape will close automatically after the 4th tap. Map scrolling is disabled while drawing.
         </div>
       )}
 
@@ -275,6 +337,7 @@ export default function YardPage() {
           zoom={17}
           style={{ height: '100%', width: '100%' }}
           scrollWheelZoom={true}
+          tap={false}
         >
           <TileLayer
             url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
