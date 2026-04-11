@@ -59,3 +59,4 @@ export const getManifestPublic = (loadId) => api.get(`/loads/${loadId}/manifest-
 
 // Dashboard
 export const getDashboardStats = () => api.get('/dashboard/stats');
+export const getDashboardAnalytics = () => api.get('/dashboard/analytics');

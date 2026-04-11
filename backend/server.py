@@ -589,6 +589,80 @@ async def total_collected(user=Depends(get_current_user)):
         "by_color": by_color
     }
 
+# ── Dashboard Analytics ───────────────────────────────────────
+@api_router.get("/dashboard/analytics")
+async def dashboard_analytics(user=Depends(get_current_user)):
+    # Loads by hauler
+    hauler_pipeline = [
+        {"$group": {"_id": "$driver_name", "count": {"$sum": 1}, "total_pallets": {"$sum": {"$reduce": {"input": {"$ifNull": ["$pallets_required", []]}, "initialValue": 0, "in": {"$add": ["$$value", {"$ifNull": ["$$this.quantity", 0]}]}}}}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 10}
+    ]
+    hauler_stats = await db.loads.aggregate(hauler_pipeline).to_list(10)
+
+    # Average days in yard (from stock movement "in" to "out")
+    in_movements = await db.stock_movements.find({"type": "in"}).sort("created_at", -1).to_list(100)
+    out_movements = await db.stock_movements.find({"type": "out"}).sort("created_at", -1).to_list(100)
+    avg_days = 0
+    if in_movements and out_movements:
+        first_in = in_movements[-1].get("created_at", "")
+        last_out = out_movements[0].get("created_at", "")
+        if first_in and last_out:
+            try:
+                from_dt = datetime.fromisoformat(first_in.replace('Z', '+00:00'))
+                to_dt = datetime.fromisoformat(last_out.replace('Z', '+00:00'))
+                diff = (to_dt - from_dt).days
+                total_out = sum(abs(m.get("change", 0)) for m in out_movements)
+                if total_out > 0:
+                    avg_days = max(1, round(diff / max(1, len(out_movements))))
+            except:
+                avg_days = 0
+
+    # Stock movements over time (last 14 days)
+    from datetime import timedelta as td
+    now = datetime.now(timezone.utc)
+    daily_movements = []
+    for i in range(13, -1, -1):
+        day = now - td(days=i)
+        day_str = day.strftime('%Y-%m-%d')
+        day_label = day.strftime('%d %b')
+        in_total = 0
+        out_total = 0
+        for m in in_movements:
+            if m.get("created_at", "").startswith(day_str):
+                in_total += m.get("change", 0)
+        for m in out_movements:
+            if m.get("created_at", "").startswith(day_str):
+                out_total += abs(m.get("change", 0))
+        daily_movements.append({"date": day_label, "in": in_total, "out": out_total})
+
+    # Collections by status
+    loading_count = await db.loads.count_documents({"status": "loading"})
+    dispatched_count = await db.loads.count_documents({"status": "in_transit"})
+    delivered_count = await db.loads.count_documents({"status": "delivered"})
+
+    # Busiest colour
+    colour_pipeline = [
+        {"$unwind": "$pallets_required"},
+        {"$group": {"_id": "$pallets_required.color", "total": {"$sum": "$pallets_required.quantity"}}},
+        {"$sort": {"total": -1}}
+    ]
+    colour_demand = await db.loads.aggregate(colour_pipeline).to_list(10)
+
+    # Total pallets moved
+    total_in = sum(m.get("change", 0) for m in in_movements)
+    total_out = sum(abs(m.get("change", 0)) for m in out_movements)
+
+    return {
+        "hauler_stats": [{"hauler": h["_id"] or "Unknown", "loads": h["count"], "pallets": h["total_pallets"]} for h in hauler_stats],
+        "avg_yard_days": avg_days,
+        "daily_movements": daily_movements,
+        "status_counts": {"upcoming": loading_count, "dispatched": dispatched_count, "delivered": delivered_count},
+        "colour_demand": [{"color": c["_id"], "total": c["total"]} for c in colour_demand],
+        "total_in": total_in,
+        "total_out": total_out,
+    }
+
 # ── Root ─────────────────────────────────────────────────────
 @api_router.get("/")
 async def root():
