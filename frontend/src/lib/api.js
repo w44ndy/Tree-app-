@@ -24,6 +24,11 @@ export const getColourQR = (color) => api.get(`/colours/${color}/qr`);
 export const checkStock = () => api.get('/stock/check');
 export const getTotalCollected = () => api.get('/stock/total-collected');
 
+// Haulers
+export const getHaulers = () => api.get('/haulers');
+export const createHauler = (data) => api.post('/haulers', data);
+export const deleteHauler = (id) => api.delete(`/haulers/${id}`);
+
 // Yard Locations
 export const getYardLocations = () => api.get('/yard-locations');
 export const createYardLocation = (data) => api.post('/yard-locations', data);

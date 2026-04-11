@@ -296,6 +296,31 @@ async def delete_yard_location(loc_id: str, user=Depends(get_current_user)):
     await db.yard_locations.delete_one({"_id": ObjectId(loc_id)})
     return {"message": "Deleted"}
 
+# ── Haulers ──────────────────────────────────────────────────
+class HaulerCreate(BaseModel):
+    name: str
+    contact: Optional[str] = None
+    phone: Optional[str] = None
+
+@api_router.get("/haulers")
+async def list_haulers(user=Depends(get_current_user)):
+    haulers = await db.haulers.find().sort("name", 1).to_list(100)
+    return [serialize_doc(h) for h in haulers]
+
+@api_router.post("/haulers")
+async def create_hauler(data: HaulerCreate, user=Depends(get_current_user)):
+    doc = data.model_dump()
+    doc["created_at"] = datetime.now(timezone.utc).isoformat()
+    result = await db.haulers.insert_one(doc)
+    doc["id"] = str(result.inserted_id)
+    doc.pop("_id", None)
+    return doc
+
+@api_router.delete("/haulers/{hauler_id}")
+async def delete_hauler(hauler_id: str, user=Depends(get_current_user)):
+    await db.haulers.delete_one({"_id": ObjectId(hauler_id)})
+    return {"message": "Deleted"}
+
 # ── Orders ───────────────────────────────────────────────────
 class OrderItem(BaseModel):
     tree_color: str
@@ -511,7 +536,8 @@ async def get_manifest(load_id: str, user=Depends(get_current_user)):
 # ── Manifest Signature ────────────────────────────────────────
 class ManifestSignature(BaseModel):
     driver_name: str
-    signature_data: str  # base64 encoded signature image
+    signature_data: str
+    registration: Optional[str] = None
     signed_at: Optional[str] = None
 
 @api_router.post("/loads/{load_id}/sign")
@@ -522,6 +548,7 @@ async def sign_manifest(load_id: str, sig: ManifestSignature):
     signature = {
         "driver_name": sig.driver_name,
         "signature_data": sig.signature_data,
+        "registration": sig.registration or "",
         "signed_at": sig.signed_at or datetime.now(timezone.utc).isoformat()
     }
     await db.loads.update_one({"_id": ObjectId(load_id)}, {"$set": {"signature": signature}})
