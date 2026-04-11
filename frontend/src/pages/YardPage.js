@@ -17,7 +17,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 });
 
-const YARD_CENTER = [57.150, -2.500];
+const YARD_CENTER = [57.1677, -2.5214]; // Mains of Corsindae AB51 7PP
 const COLOR_MAP = { green: '#16a34a', blue: '#2563eb', silver: '#6b7280', red: '#dc2626', gold: '#ca8a04' };
 const BAY_COLORS = ['#16a34a', '#2563eb', '#dc2626', '#ca8a04', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
 
@@ -47,107 +47,117 @@ function makeRotatedRect(center, width, height, angleDeg) {
   return corners.map(c => rotatePoint(center, c, angleDeg));
 }
 
-function DrawPolygonTool({ isDrawing, onPolygonDrawn, onCancel }) {
-  const [points, setPoints] = useState([]);
+function DrawPolygonTool({ isDrawing, onPolygonDrawn }) {
   const map = useMap();
-  const pointsRef = useRef([]);
-
-  // Keep ref in sync
-  useEffect(() => { pointsRef.current = points; }, [points]);
 
   useEffect(() => {
-    if (!map) return;
+    if (!map || !isDrawing) return;
 
-    const container = map.getContainer();
+    // Disable map interactions
+    map.dragging.disable();
+    map.touchZoom.disable();
+    map.doubleClickZoom.disable();
+    map.scrollWheelZoom.disable();
+    map.boxZoom.disable();
+    if (map.tap) map.tap.disable();
 
-    if (isDrawing) {
-      // Disable ALL map interactions
-      map.dragging.disable();
-      map.touchZoom.disable();
-      map.doubleClickZoom.disable();
-      map.scrollWheelZoom.disable();
-      map.boxZoom.disable();
-      if (map.tap) map.tap.disable();
-      container.style.cursor = 'crosshair';
-
-      // Direct touch/click handler on the map container
-      const handleTap = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-
-        // Get coordinates from touch or mouse
-        let clientX, clientY;
-        if (e.touches && e.touches.length > 0) {
-          clientX = e.touches[0].clientX;
-          clientY = e.touches[0].clientY;
-        } else if (e.changedTouches && e.changedTouches.length > 0) {
-          clientX = e.changedTouches[0].clientX;
-          clientY = e.changedTouches[0].clientY;
-        } else {
-          clientX = e.clientX;
-          clientY = e.clientY;
-        }
-
-        // Convert screen coords to map latlng
-        const rect = container.getBoundingClientRect();
-        const point = L.point(clientX - rect.left, clientY - rect.top);
-        const latlng = map.containerPointToLatLng(point);
-
-        const current = [...pointsRef.current, [latlng.lat, latlng.lng]];
-        pointsRef.current = current;
-        setPoints([...current]);
-
-        if (current.length >= 4) {
-          onPolygonDrawn(current);
-          pointsRef.current = [];
-          setPoints([]);
-        }
-      };
-
-      // Use touchend for iPad/iPhone, click for desktop
-      container.addEventListener('touchend', handleTap, { passive: false });
-      container.addEventListener('click', handleTap);
-
-      return () => {
-        container.removeEventListener('touchend', handleTap);
-        container.removeEventListener('click', handleTap);
-        map.dragging.enable();
-        map.touchZoom.enable();
-        map.doubleClickZoom.enable();
-        map.scrollWheelZoom.enable();
-        map.boxZoom.enable();
-        if (map.tap) map.tap.enable();
-        container.style.cursor = '';
-      };
-    } else {
+    return () => {
       map.dragging.enable();
       map.touchZoom.enable();
       map.doubleClickZoom.enable();
       map.scrollWheelZoom.enable();
       map.boxZoom.enable();
       if (map.tap) map.tap.enable();
-      container.style.cursor = '';
-      pointsRef.current = [];
-      setPoints([]);
-    }
-  }, [isDrawing, map, onPolygonDrawn]);
+    };
+  }, [isDrawing, map]);
 
-  if (!isDrawing || points.length === 0) return null;
-
-  if (points.length >= 2) {
-    return <Polygon positions={points} pathOptions={{ color: '#1A4331', weight: 2, fillOpacity: 0.2, dashArray: '6,4' }} />;
-  }
-  // Show markers for single point
-  if (points.length === 1) {
-    const icon = L.divIcon({
-      className: 'draw-point',
-      html: '<div style="width:12px;height:12px;background:#1A4331;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3);"></div>',
-      iconSize: [12, 12],
-      iconAnchor: [6, 6],
-    });
-    return <Marker position={points[0]} icon={icon} />;
-  }
   return null;
+}
+
+// Overlay component that sits ON TOP of the map to capture taps
+function DrawOverlay({ isDrawing, mapRef, onPolygonDrawn }) {
+  const [points, setPoints] = useState([]);
+  const overlayRef = useRef(null);
+
+  // Reset points when drawing mode changes
+  useEffect(() => {
+    if (!isDrawing) setPoints([]);
+  }, [isDrawing]);
+
+  const handleTap = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!mapRef.current || !isDrawing) return;
+
+    let clientX, clientY;
+    if (e.type === 'touchend' && e.changedTouches?.length > 0) {
+      clientX = e.changedTouches[0].clientX;
+      clientY = e.changedTouches[0].clientY;
+    } else if (e.type === 'click') {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    } else {
+      return;
+    }
+
+    const map = mapRef.current;
+    const container = map.getContainer();
+    const rect = container.getBoundingClientRect();
+    const point = L.point(clientX - rect.left, clientY - rect.top);
+    const latlng = map.containerPointToLatLng(point);
+
+    setPoints(prev => {
+      const newPoints = [...prev, [latlng.lat, latlng.lng]];
+      if (newPoints.length >= 4) {
+        onPolygonDrawn(newPoints);
+        return [];
+      }
+      return newPoints;
+    });
+  }, [isDrawing, mapRef, onPolygonDrawn]);
+
+  if (!isDrawing) return null;
+
+  return (
+    <div
+      ref={overlayRef}
+      onClick={handleTap}
+      onTouchEnd={handleTap}
+      style={{
+        position: 'absolute',
+        top: 0, left: 0, right: 0, bottom: 0,
+        zIndex: 1000,
+        cursor: 'crosshair',
+        touchAction: 'none',
+      }}
+    >
+      {/* Point counter */}
+      <div style={{
+        position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)',
+        background: 'rgba(26,67,49,0.9)', color: 'white', padding: '6px 16px',
+        borderRadius: 8, fontSize: 13, fontWeight: 600, zIndex: 1001,
+        fontFamily: 'Outfit, sans-serif',
+      }}>
+        Tap corner {points.length + 1} of 4
+      </div>
+
+      {/* Visual dots for placed points */}
+      {points.map((p, i) => {
+        if (!mapRef.current) return null;
+        const px = mapRef.current.latLngToContainerPoint(L.latLng(p[0], p[1]));
+        return (
+          <div key={i} style={{
+            position: 'absolute', left: px.x - 8, top: px.y - 8,
+            width: 16, height: 16, borderRadius: '50%',
+            background: '#1A4331', border: '3px solid white',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+            zIndex: 1002, pointerEvents: 'none',
+          }} />
+        );
+      })}
+    </div>
+  );
 }
 
 function BayPolygon({ bay, onDelete, idx }) {
@@ -215,6 +225,7 @@ export default function YardPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [pendingPolygon, setPendingPolygon] = useState(null);
   const [form, setForm] = useState({ name: '', section: 'A', capacity: 20, description: '' });
+  const mapRef = useRef(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -331,13 +342,14 @@ export default function YardPage() {
       )}
 
       {/* Map */}
-      <div className="bg-white border border-[#1A4331]/15 rounded-xl overflow-hidden" style={{ height: '500px' }} data-testid="yard-map">
+      <div className="bg-white border border-[#1A4331]/15 rounded-xl overflow-hidden relative" style={{ height: '500px' }} data-testid="yard-map">
         <MapContainer
           center={YARD_CENTER}
           zoom={17}
           style={{ height: '100%', width: '100%' }}
           scrollWheelZoom={true}
           tap={false}
+          ref={mapRef}
         >
           <TileLayer
             url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
@@ -351,7 +363,6 @@ export default function YardPage() {
           <DrawPolygonTool
             isDrawing={isDrawing}
             onPolygonDrawn={handlePolygonDrawn}
-            onCancel={() => setIsDrawing(false)}
           />
           {locations.map((loc, idx) => (
             <React.Fragment key={loc.id}>
@@ -360,6 +371,7 @@ export default function YardPage() {
             </React.Fragment>
           ))}
         </MapContainer>
+        <DrawOverlay isDrawing={isDrawing} mapRef={mapRef} onPolygonDrawn={handlePolygonDrawn} />
       </div>
 
       {/* Stock by Colour */}
