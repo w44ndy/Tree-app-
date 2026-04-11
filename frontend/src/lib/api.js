@@ -28,6 +28,10 @@ export const getTotalCollected = () => api.get('/stock/total-collected');
 export const getFieldCollections = () => api.get('/field-collections');
 export const createFieldCollection = (data) => api.post('/field-collections', data);
 
+// Field Status (Ready for Collection)
+export const getFieldStatus = () => api.get('/field-status');
+export const updateFieldStatus = (data) => api.put('/field-status', data);
+
 // Haulers
 export const getHaulers = () => api.get('/haulers');
 export const createHauler = (data) => api.post('/haulers', data);

@@ -333,9 +333,39 @@ async def create_field_collection(data: FieldCollectionCreate, user=Depends(get_
         })
     doc["total_pallets"] = total
     result = await db.field_collections.insert_one(doc)
+    # Auto-decrement field ready status
+    for item in doc["items"]:
+        color = item["color"].lower().strip()
+        qty = item["quantity"]
+        status = await db.field_status.find_one({"color": color})
+        if status and status.get("quantity", 0) > 0:
+            new_qty = max(0, status["quantity"] - qty)
+            await db.field_status.update_one({"color": color}, {"$set": {"quantity": new_qty, "updated_at": datetime.now(timezone.utc).isoformat()}})
     doc["id"] = str(result.inserted_id)
     doc.pop("_id", None)
     return doc
+
+# ── Field Status (Ready for Collection) ──────────────────────
+class FieldStatusUpdate(BaseModel):
+    color: str
+    quantity: int
+
+@api_router.get("/field-status")
+async def get_field_status(user=Depends(get_current_user)):
+    statuses = await db.field_status.find().to_list(100)
+    return [serialize_doc(s) for s in statuses]
+
+@api_router.put("/field-status")
+async def update_field_status(data: FieldStatusUpdate, user=Depends(get_current_user)):
+    color = data.color.lower().strip()
+    qty = max(0, data.quantity)
+    result = await db.field_status.find_one_and_update(
+        {"color": color},
+        {"$set": {"color": color, "quantity": qty, "updated_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True,
+        return_document=True
+    )
+    return serialize_doc(result)
 
 # ── Haulers ──────────────────────────────────────────────────
 class HaulerCreate(BaseModel):
