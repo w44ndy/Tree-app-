@@ -21,7 +21,9 @@ export default function LoadsPage() {
   const [showManifest, setShowManifest] = useState(null);
   const [manifestData, setManifestData] = useState(null);
   const [showLoadingView, setShowLoadingView] = useState(null);
-  const [selectedPallet, setSelectedPallet] = useState('');
+  const [selectedColour, setSelectedColour] = useState('');
+  const [loadQty, setLoadQty] = useState(1);
+  const [colours, setColours] = useState([]);
   const [form, setForm] = useState({
     lorry_id: '', destinations: [{ address: '', order_id: '', notes: '' }],
     departure_date: '', driver_name: '', notes: ''
