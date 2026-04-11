@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getDashboardStats, getLoads, getColours } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import {
-  Package, TreePine, Truck, Camera,
+  Package, TreePine, Truck,
   RefreshCw, CheckCircle, AlertTriangle, XCircle,
   Calendar, MapPin, ArrowRight
 } from 'lucide-react';
@@ -97,7 +97,7 @@ export default function DashboardPage() {
         <>
           {/* Top KPIs */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4" data-testid="stats-grid">
-            <div className="stat-card">
+            <div className="stat-card cursor-pointer" onClick={() => navigate('/pallets')} data-testid="stat-in-stock">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-[#4A5D53]">In Stock</span>
                 <Package className="w-4 h-4 text-[#1A4331]" />
@@ -105,7 +105,7 @@ export default function DashboardPage() {
               <p className="text-2xl font-bold text-[#0A1711] font-['Outfit']">{totalStock}</p>
               <p className="text-xs text-[#4A5D53]">{(totalStock * 100).toLocaleString()} trees</p>
             </div>
-            <div className="stat-card">
+            <div className="stat-card cursor-pointer" onClick={() => navigate('/loads')} data-testid="stat-required">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-[#4A5D53]">Required</span>
                 <TreePine className="w-4 h-4 text-[#E27B58]" />
@@ -113,7 +113,7 @@ export default function DashboardPage() {
               <p className="text-2xl font-bold text-[#0A1711] font-['Outfit']">{totalNeeded}</p>
               <p className="text-xs text-[#4A5D53]">pallets for {upcomingCollections.length} collection{upcomingCollections.length !== 1 ? 's' : ''}</p>
             </div>
-            <div className="stat-card">
+            <div className="stat-card cursor-pointer" onClick={() => navigate('/pallets')} data-testid="stat-status">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-[#4A5D53]">Status</span>
                 {allFulfilled ? <CheckCircle className="w-4 h-4 text-emerald-600" /> : <AlertTriangle className="w-4 h-4 text-amber-500" />}
@@ -123,7 +123,7 @@ export default function DashboardPage() {
               </p>
               <p className="text-xs text-[#4A5D53]">{allFulfilled ? 'Stock covers all collections' : 'from the field'}</p>
             </div>
-            <div className="stat-card">
+            <div className="stat-card cursor-pointer" onClick={() => navigate('/loads')} data-testid="stat-collections">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-[#4A5D53]">Collections</span>
                 <Truck className="w-4 h-4 text-[#1A4331]" />
@@ -260,25 +260,6 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Camera Feed */}
-          <div className="bg-white border border-[#1A4331]/15 rounded-xl overflow-hidden" data-testid="camera-feed">
-            <div className="px-4 py-3 border-b border-[#1A4331]/10 flex items-center gap-2">
-              <Camera className="w-4 h-4 text-[#1A4331]" />
-              <span className="text-sm font-semibold text-[#0A1711] font-['Outfit']">Live Camera Feed</span>
-              <span className="ml-auto w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-            </div>
-            <div className="aspect-[21/9] relative bg-gray-900">
-              <img
-                src="https://static.prod-images.emergentagent.com/jobs/1bf62ab5-4add-4c71-a4bb-fc46b76e2d54/images/d98bd188c6f1468a626d889f1d09dc0d344e6030db5b23e9c426a006bc068c8f.png"
-                alt="CCTV Feed - Yard"
-                className="w-full h-full object-cover opacity-80"
-              />
-              <div className="absolute bottom-2 left-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded font-mono">CAM 01 — YARD</div>
-            </div>
-            <div className="p-3 text-center">
-              <p className="text-[10px] text-[#4A5D53] uppercase tracking-wider">Reolink — provide camera IP to enable live feed</p>
-            </div>
-          </div>
         </>
       )}
     </div>
