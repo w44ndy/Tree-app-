@@ -1,7 +1,18 @@
 import axios from 'axios';
+import { getAuthHeaders } from '../contexts/AuthContext';
 
 const API = process.env.REACT_APP_BACKEND_URL;
+
 const api = axios.create({ baseURL: `${API}/api`, withCredentials: true });
+
+// Add auth header to every request as Safari fallback
+api.interceptors.request.use((config) => {
+  const headers = getAuthHeaders();
+  if (headers.Authorization) {
+    config.headers.Authorization = headers.Authorization;
+  }
+  return config;
+});
 
 // Colours / Stock
 export const getColours = () => api.get('/colours');

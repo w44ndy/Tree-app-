@@ -111,7 +111,7 @@ async def login(req: LoginRequest, response: Response):
     access = create_access_token(uid, email, user.get("role", "viewer"))
     refresh = create_refresh_token(uid)
     set_auth_cookies(response, access, refresh)
-    return {"id": uid, "email": email, "name": user.get("name", ""), "role": user.get("role", "viewer")}
+    return {"id": uid, "email": email, "name": user.get("name", ""), "role": user.get("role", "viewer"), "token": access}
 
 @api_router.post("/auth/register")
 async def register(req: RegisterRequest, response: Response):

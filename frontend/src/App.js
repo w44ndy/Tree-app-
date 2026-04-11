@@ -12,18 +12,21 @@ import LoadsPage from './pages/LoadsPage';
 import LorriesPage from './pages/LorriesPage';
 import './App.css';
 
+const WC_LOGO = "https://customer-assets.emergentagent.com/job_tree-logistics/artifacts/7lohxwsd_2025Logo.png";
+
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#F4F1ED]" data-testid="loading-screen">
+      <img src={WC_LOGO} alt="Wilson Contractors" className="h-16 object-contain mb-6" />
+      <div className="w-10 h-10 border-3 border-[#1A4331] border-t-transparent rounded-full animate-spin mb-4" />
+      <p className="text-sm text-[#4A5D53] font-['Work_Sans']">Loading Tree Management System...</p>
+    </div>
+  );
+}
+
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F4F1ED]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-[#1A4331] border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-[#4A5D53]">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <LoadingScreen />;
   if (user === false) return <Navigate to="/login" />;
   return <Layout>{children}</Layout>;
 }
@@ -31,13 +34,7 @@ function ProtectedRoute({ children }) {
 function AppRoutes() {
   const { user, loading } = useAuth();
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F4F1ED]">
-        <div className="w-8 h-8 border-2 border-[#1A4331] border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  if (loading) return <LoadingScreen />;
 
   return (
     <Routes>

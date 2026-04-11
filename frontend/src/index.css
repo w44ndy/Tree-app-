@@ -100,17 +100,25 @@ code {
   display: none;
 }
 
-/* Hide Emergent badge */
+/* Hide Emergent badge - Safari compatible */
 [data-testid="made-with-emergent"],
 a[href*="emergent"],
 div[class*="emergent-badge"],
 #made-with-emergent,
 .__emergent_badge,
-div[style*="z-index: 2147483647"] {
+div[style*="z-index: 2147483647"],
+div[style*="z-index:2147483647"],
+iframe[src*="emergent"],
+div:has(> a[href*="emergent.sh"]) {
   display: none !important;
   visibility: hidden !important;
   opacity: 0 !important;
   pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  position: absolute !important;
+  left: -9999px !important;
 }
 
 /* Scrollbar */
