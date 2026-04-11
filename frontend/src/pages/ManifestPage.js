@@ -61,6 +61,10 @@ export default function ManifestPage() {
           setSignatureImg(data.load.signature.signature_data);
           setDriverName(data.load.signature.driver_name);
           setRegistration(data.load.signature.registration || '');
+          // Auto-tick all checkboxes for signed manifests
+          const ticks = {};
+          (data.load.pallets_required || []).forEach((_, i) => { ticks[i] = true; });
+          setCheckedItems(ticks);
         }
       } catch { }
       setLoading(false);
@@ -102,7 +106,7 @@ export default function ManifestPage() {
         <div className="flex items-start justify-between border-b-2 border-[#1A4331] pb-3 mb-3">
           <div>
             <img src={WC_LOGO} alt="Wilson Contractors" className="h-10 object-contain" />
-            <p className="text-[9px] text-[#4A5D53] mt-1">Mains of Corsindae, Sauchen, AB51 7QL</p>
+            <p className="text-[9px] text-[#4A5D53] mt-1">Mains of Corsindae, Sauchen, AB51 7PN</p>
           </div>
           <div className="text-right">
             <h2 className="text-sm font-bold text-[#1A4331] uppercase tracking-wider" style={{ fontFamily: 'Outfit, sans-serif' }}>Collection Manifest</h2>
