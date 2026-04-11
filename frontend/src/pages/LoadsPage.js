@@ -56,6 +56,8 @@ export default function LoadsPage() {
   const [checkedItems, setCheckedItems] = useState({});
   const [driverName, setDriverName] = useState('');
   const [registration, setRegistration] = useState('');
+  const [justDispatched, setJustDispatched] = useState(false);
+  const [signatureImg, setSignatureImg] = useState(null);
   const [newHauler, setNewHauler] = useState('');
   const [form, setForm] = useState({
     hauler: '', collection_date: '', destinations: [{ address: '' }],
@@ -153,11 +155,23 @@ export default function LoadsPage() {
     try {
       await signManifest(showManifest, { driver_name: driverName, signature_data: signatureData, registration });
       try { await updateLoad(showManifest, { status: 'in_transit' }); } catch {}
+      setSignatureImg(signatureData);
+      setJustDispatched(true);
       toast.success('Signed & dispatched');
-      setShowManifest(null);
-      setManifestLoad(null);
       fetchData();
     } catch { toast.error('Failed to sign'); }
+  };
+
+  const closeDispatchDialog = () => {
+    setShowManifest(null);
+    setManifestLoad(null);
+    setJustDispatched(false);
+    setSignatureImg(null);
+  };
+
+  const printAndClose = () => {
+    window.open(`/manifest/${showManifest}`, '_blank');
+    closeDispatchDialog();
   };
 
   const toggleCheck = (i) => setCheckedItems(prev => ({ ...prev, [i]: !prev[i] }));
@@ -345,12 +359,11 @@ export default function LoadsPage() {
       )}
 
       {/* ── Dispatch Manifest Dialog (inline check-off + sign) ── */}
-      <Dialog open={!!showManifest} onOpenChange={(open) => { if (!open) { setShowManifest(null); setManifestLoad(null); } }}>
+      <Dialog open={!!showManifest} onOpenChange={(open) => { if (!open) closeDispatchDialog(); }}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="dispatch-manifest-dialog">
-          <DialogHeader><DialogTitle className="font-['Outfit']">Dispatch — Check Off & Sign</DialogTitle></DialogHeader>
-          {manifestLoad && (
+          <DialogHeader><DialogTitle className="font-['Outfit']">{justDispatched ? 'Dispatched' : 'Dispatch — Check Off & Sign'}</DialogTitle></DialogHeader>
+          {manifestLoad && !justDispatched && (
             <div className="space-y-4 mt-2">
-              {/* Header */}
               <div className="flex items-start gap-3 border-b border-[#1A4331]/10 pb-3">
                 <img src={WC_LOGO} alt="WC" className="h-10 object-contain" />
                 <div>
@@ -358,8 +371,6 @@ export default function LoadsPage() {
                   <p className="text-xs text-[#4A5D53]">{fmtDate(manifestLoad.departure_date)} &middot; {manifestLoad.destinations?.map(d => d.address).join(', ')}</p>
                 </div>
               </div>
-
-              {/* Tickable pallets */}
               <div className="space-y-2">
                 {mPallets.map((p, i) => (
                   <div key={i} onClick={() => toggleCheck(i)}
@@ -375,11 +386,8 @@ export default function LoadsPage() {
                   </div>
                 ))}
               </div>
-
               {!allChecked && mPallets.length > 0 && <p className="text-xs text-amber-600">Tap each row to check off with the driver</p>}
               {allChecked && <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2"><p className="text-sm text-emerald-800 font-medium">All checked — fill in driver details and sign below</p></div>}
-
-              {/* Driver details + signature */}
               <div className="border-t border-[#1A4331]/10 pt-4 space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -395,6 +403,32 @@ export default function LoadsPage() {
                   <Label className="text-xs text-[#4A5D53] font-bold uppercase tracking-wider flex items-center gap-1"><PenTool className="w-3 h-3" /> Signature</Label>
                   <div className="mt-1"><SignaturePad onSave={handleSign} /></div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Success state after signing */}
+          {justDispatched && (
+            <div className="space-y-5 mt-2 py-4">
+              <div className="flex flex-col items-center text-center">
+                <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mb-3">
+                  <CheckCircle className="w-8 h-8 text-emerald-600" />
+                </div>
+                <h3 className="text-xl font-bold text-[#0A1711] font-['Outfit']">Collection Dispatched</h3>
+                <p className="text-sm text-[#4A5D53] mt-1">Signed by {driverName}{registration ? ` — ${registration}` : ''}</p>
+              </div>
+              {signatureImg && (
+                <div className="flex justify-center">
+                  <img src={signatureImg} alt="Signature" className="max-h-14 opacity-70" />
+                </div>
+              )}
+              <div className="flex flex-col gap-2">
+                <Button onClick={printAndClose} className="w-full bg-[#1A4331] text-white h-12" data-testid="print-dispatch">
+                  <Printer className="w-4 h-4 mr-2" /> Print Manifest
+                </Button>
+                <Button onClick={closeDispatchDialog} variant="outline" className="w-full h-12 border-[#1A4331]/20" data-testid="close-dispatch">
+                  Close
+                </Button>
               </div>
             </div>
           )}
