@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getLoads, getColours, getDashboardAnalytics } from '../lib/api';
+import { getLoads, getColours, getDashboardAnalytics, getFieldStatus } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import {
   Package, TreePine, Truck, Clock,
@@ -23,17 +23,21 @@ export default function DashboardPage() {
   const [loads, setLoads] = useState([]);
   const [colours, setColours] = useState([]);
   const [analytics, setAnalytics] = useState(null);
+  const [fieldStatus, setFieldStatus] = useState({});
   const [loading, setLoading] = useState(true);
 
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [loadsRes, coloursRes, analyticsRes] = await Promise.all([
-        getLoads(), getColours(), getDashboardAnalytics()
+      const [loadsRes, coloursRes, analyticsRes, fsRes] = await Promise.all([
+        getLoads(), getColours(), getDashboardAnalytics(), getFieldStatus()
       ]);
       setLoads(loadsRes.data);
       setColours(coloursRes.data);
       setAnalytics(analyticsRes.data);
+      const statusMap = {};
+      (fsRes.data || []).forEach(s => { statusMap[s.color] = s.quantity || 0; });
+      setFieldStatus(statusMap);
     } catch (err) {
       console.error('Failed to fetch', err);
     } finally {
@@ -78,6 +82,11 @@ export default function DashboardPage() {
   const allFulfilled = fulfillmentSummary.every(f => f.ok);
   const totalNeeded = fulfillmentSummary.reduce((sum, f) => sum + f.needed, 0);
   const totalShortfall = fulfillmentSummary.reduce((sum, f) => sum + f.shortfall, 0);
+
+  const FULL_LOAD = 10;
+  const totalFieldReady = Object.values(fieldStatus).reduce((s, v) => s + v, 0);
+  const fullLoads = Math.floor(totalFieldReady / FULL_LOAD);
+  const fieldRemainder = totalFieldReady % FULL_LOAD;
 
   const checkCollectionFulfillment = (pallets_required) => {
     if (!pallets_required?.length) return 'none';
@@ -158,6 +167,48 @@ export default function DashboardPage() {
               <p className="text-xl font-bold text-[#0A1711] font-['Outfit']">{analytics?.total_out || 0}</p>
               <p className="text-[10px] text-[#4A5D53]">{((analytics?.total_out || 0) * 100).toLocaleString()} trees dispatched</p>
             </div>
+          </div>
+
+          {/* Field Status */}
+          <div className={`rounded-xl p-4 border-2 cursor-pointer transition-colors ${totalFieldReady >= FULL_LOAD ? 'bg-emerald-50 border-emerald-400' : totalFieldReady > 0 ? 'bg-amber-50 border-amber-300' : 'bg-white border-[#1A4331]/15'}`} onClick={() => navigate('/field')} data-testid="dashboard-field-status">
+            <div className="flex items-center gap-4">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${totalFieldReady >= FULL_LOAD ? 'bg-emerald-500' : totalFieldReady > 0 ? 'bg-amber-400' : 'bg-[#1A4331]/10'}`}>
+                <Truck className={`w-5 h-5 ${totalFieldReady > 0 ? 'text-white' : 'text-[#4A5D53]'}`} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-semibold text-[#0A1711] font-['Outfit']">Field Status</h3>
+                  {totalFieldReady >= FULL_LOAD && (
+                    <span className="text-[10px] font-bold bg-emerald-500 text-white px-2 py-0.5 rounded-full" data-testid="dashboard-full-load-badge">
+                      {fullLoads} FULL LOAD{fullLoads > 1 ? 'S' : ''}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-[#4A5D53]">
+                  {totalFieldReady === 0 ? 'No pallets marked ready in field' : totalFieldReady >= FULL_LOAD ? `${totalFieldReady} pallets ready — ${fullLoads} full trailer${fullLoads > 1 ? 's' : ''}${fieldRemainder > 0 ? ` + ${fieldRemainder} extra` : ''}` : `${totalFieldReady} of ${FULL_LOAD} pallets ready — need ${FULL_LOAD - totalFieldReady} more for full load`}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {colours.filter(c => (fieldStatus[c.color] || 0) > 0).map(c => (
+                  <div key={c.color} className="text-center">
+                    <div className="w-3 h-3 rounded-full mx-auto mb-0.5" style={{ backgroundColor: COLOR_MAP[c.color] || '#1A4331' }} />
+                    <span className="text-xs font-bold text-[#0A1711]">{fieldStatus[c.color]}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex-shrink-0">
+                <div className="w-14 h-14 rounded-xl bg-white/80 flex flex-col items-center justify-center border border-[#1A4331]/10">
+                  <span className="text-xl font-bold text-[#0A1711] font-['Outfit'] leading-none">{totalFieldReady}</span>
+                  <span className="text-[8px] text-[#4A5D53] uppercase tracking-wider">ready</span>
+                </div>
+              </div>
+              <ArrowRight className="w-4 h-4 text-[#4A5D53] flex-shrink-0" />
+            </div>
+            {totalFieldReady > 0 && (
+              <div className="mt-3 w-full h-2 bg-white/60 rounded-full overflow-hidden">
+                <div className={`h-full rounded-full transition-all duration-500 ${totalFieldReady >= FULL_LOAD ? 'bg-emerald-500' : totalFieldReady >= FULL_LOAD * 0.7 ? 'bg-amber-400' : 'bg-[#1A4331]'}`} style={{ width: `${Math.min(100, (totalFieldReady / FULL_LOAD) * 100)}%` }} />
+              </div>
+            )}
           </div>
 
           {/* Row 2: Stock fulfillment + Hauler stats */}

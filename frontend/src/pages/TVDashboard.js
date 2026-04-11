@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getLoads, getColours, getDashboardAnalytics } from '../lib/api';
+import { getLoads, getColours, getDashboardAnalytics, getFieldStatus } from '../lib/api';
 import { CheckCircle, AlertTriangle, XCircle, Truck, Package, TreePine, Clock, Calendar, MapPin } from 'lucide-react';
 
 const COLOR_HEX = { green: '#16a34a', blue: '#2563eb', silver: '#6b7280', red: '#dc2626', gold: '#ca8a04', yellow: '#eab308', orange: '#f97316' };
@@ -9,16 +9,20 @@ export default function TVDashboard() {
   const [loads, setLoads] = useState([]);
   const [colours, setColours] = useState([]);
   const [analytics, setAnalytics] = useState(null);
+  const [fieldStatus, setFieldStatus] = useState({});
   const [time, setTime] = useState(new Date());
 
   const fetchAll = async () => {
     try {
-      const [loadsRes, coloursRes, analyticsRes] = await Promise.all([
-        getLoads(), getColours(), getDashboardAnalytics()
+      const [loadsRes, coloursRes, analyticsRes, fsRes] = await Promise.all([
+        getLoads(), getColours(), getDashboardAnalytics(), getFieldStatus()
       ]);
       setLoads(loadsRes.data);
       setColours(coloursRes.data);
       setAnalytics(analyticsRes.data);
+      const statusMap = {};
+      (fsRes.data || []).forEach(s => { statusMap[s.color] = s.quantity || 0; });
+      setFieldStatus(statusMap);
     } catch {}
   };
 
@@ -49,6 +53,10 @@ export default function TVDashboard() {
   const totalNeeded = Object.values(totalRequired).reduce((s, v) => s + v, 0);
   const totalShortfall = Object.entries(totalRequired).reduce((s, [c, n]) => s + Math.max(0, n - getStock(c)), 0);
   const allGood = totalShortfall === 0;
+
+  const FULL_LOAD = 10;
+  const totalFieldReady = Object.values(fieldStatus).reduce((s, v) => s + v, 0);
+  const fullLoads = Math.floor(totalFieldReady / FULL_LOAD);
 
   const fmtDate = (s) => {
     if (!s) return '';
@@ -86,6 +94,34 @@ export default function TVDashboard() {
               <span className="text-lg font-bold">{totalNeeded === 0 ? 'No Orders' : allGood ? 'Stock OK' : `Need ${totalShortfall} More`}</span>
             </div>
             <p className="text-sm text-white/50">{allGood && totalNeeded > 0 ? 'All collections covered' : totalShortfall > 0 ? 'Collect from field' : 'No upcoming collections'}</p>
+          </div>
+
+          {/* Field Status */}
+          <div className={`rounded-2xl p-4 ${totalFieldReady >= FULL_LOAD ? 'bg-emerald-900/40 border border-emerald-500/30' : totalFieldReady > 0 ? 'bg-amber-900/30 border border-amber-500/30' : 'bg-white/5 border border-white/10'}`} data-testid="tv-field-status">
+            <div className="flex items-center gap-3 mb-2">
+              <Truck className={`w-5 h-5 ${totalFieldReady >= FULL_LOAD ? 'text-emerald-400' : totalFieldReady > 0 ? 'text-amber-400' : 'text-white/40'}`} />
+              <span className="text-base font-bold">Field Status</span>
+              {totalFieldReady >= FULL_LOAD && (
+                <span className="text-[10px] font-bold bg-emerald-500 text-black px-2 py-0.5 rounded-full ml-auto">{fullLoads} FULL</span>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-3xl font-bold tabular-nums">{totalFieldReady}</span>
+              <span className="text-sm text-white/50">/ {FULL_LOAD} for trailer</span>
+            </div>
+            <div className="mt-2 w-full h-2 bg-white/10 rounded-full overflow-hidden">
+              <div className={`h-full rounded-full transition-all ${totalFieldReady >= FULL_LOAD ? 'bg-emerald-500' : totalFieldReady >= 7 ? 'bg-amber-400' : 'bg-white/30'}`} style={{ width: `${Math.min(100, (totalFieldReady / FULL_LOAD) * 100)}%` }} />
+            </div>
+            {totalFieldReady > 0 && (
+              <div className="flex gap-2 mt-2">
+                {Object.entries(fieldStatus).filter(([_, q]) => q > 0).map(([color, qty]) => (
+                  <div key={color} className="flex items-center gap-1">
+                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLOR_HEX[color] || '#fff' }} />
+                    <span className="text-xs text-white/60">{qty}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Stock by colour */}
