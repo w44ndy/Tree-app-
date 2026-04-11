@@ -49,6 +49,8 @@ export const updateLoad = (id, data) => api.put(`/loads/${id}`, data);
 export const addPalletToLoad = (loadId, data) => api.post(`/loads/${loadId}/add-pallet`, data);
 export const removePalletFromLoad = (loadId, position) => api.post(`/loads/${loadId}/remove-pallet`, null, { params: { position } });
 export const getManifest = (loadId) => api.get(`/loads/${loadId}/manifest`);
+export const signManifest = (loadId, data) => api.post(`/loads/${loadId}/sign`, data);
+export const getManifestPublic = (loadId) => api.get(`/loads/${loadId}/manifest-public`);
 
 // Dashboard
 export const getDashboardStats = () => api.get('/dashboard/stats');

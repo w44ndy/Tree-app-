@@ -504,6 +504,34 @@ async def get_manifest(load_id: str, user=Depends(get_current_user)):
             lorry = serialize_doc(lorry_doc)
     return {"load": load_data, "pallets": enriched_pallets, "lorry": lorry}
 
+# ── Manifest Signature ────────────────────────────────────────
+class ManifestSignature(BaseModel):
+    driver_name: str
+    signature_data: str  # base64 encoded signature image
+    signed_at: Optional[str] = None
+
+@api_router.post("/loads/{load_id}/sign")
+async def sign_manifest(load_id: str, sig: ManifestSignature):
+    load = await db.loads.find_one({"_id": ObjectId(load_id)})
+    if not load:
+        raise HTTPException(status_code=404, detail="Load not found")
+    signature = {
+        "driver_name": sig.driver_name,
+        "signature_data": sig.signature_data,
+        "signed_at": sig.signed_at or datetime.now(timezone.utc).isoformat()
+    }
+    await db.loads.update_one({"_id": ObjectId(load_id)}, {"$set": {"signature": signature}})
+    return {"message": "Manifest signed", "signed_at": signature["signed_at"]}
+
+@api_router.get("/loads/{load_id}/manifest-public")
+async def get_manifest_public(load_id: str):
+    """Public endpoint for driver to view and sign manifest (no auth required)"""
+    load = await db.loads.find_one({"_id": ObjectId(load_id)})
+    if not load:
+        raise HTTPException(status_code=404, detail="Load not found")
+    load_data = serialize_doc(load)
+    return {"load": load_data}
+
 # ── Total Collected Stats ─────────────────────────────────────
 @api_router.get("/stock/total-collected")
 async def total_collected(user=Depends(get_current_user)):

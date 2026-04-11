@@ -6,7 +6,7 @@ import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
-import { Plus, Trash2, Printer, Truck, MapPin, Calendar, Building2, CheckCircle, AlertTriangle, XCircle, Package } from 'lucide-react';
+import { Plus, Trash2, Printer, Truck, MapPin, Calendar, Building2, CheckCircle, AlertTriangle, XCircle, Package, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function LoadsPage() {
@@ -305,8 +305,11 @@ export default function LoadsPage() {
                         Mark Delivered
                       </Button>
                     )}
-                    <Button variant="ghost" size="sm" onClick={() => handleShowManifest(load.id)} data-testid={`manifest-${load.id}`}>
+                    <Button variant="ghost" size="sm" onClick={() => window.open(`/manifest/${load.id}`, '_blank')} data-testid={`manifest-${load.id}`}>
                       <Printer className="w-4 h-4 text-[#1A4331]" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/manifest/${load.id}`); toast.success('Manifest link copied — send to driver'); }} title="Copy link for driver" data-testid={`share-${load.id}`}>
+                      <ExternalLink className="w-4 h-4 text-[#4A5D53]" />
                     </Button>
                   </div>
                 </div>
