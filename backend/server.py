@@ -163,81 +163,90 @@ async def refresh_token(request: Request, response: Response):
         raise HTTPException(status_code=401, detail="Invalid refresh token")
 
 # ── Pallet Models & Endpoints ────────────────────────────────
-class PalletCreate(BaseModel):
-    pallet_number: str
-    tree_color: str  # green, blue, silver
-    tree_species: str = "Nordmann Fir"
-    tree_size: str = "6ft"
-    quantity: int = 50
-    location: str = "field"
-    yard_position: Optional[str] = None
+# Stock is tracked per colour. QR codes are per colour (printed in rolls).
+# Quantity goes up when pallets arrive from field, down when loaded.
+
+class StockAdjust(BaseModel):
+    color: str
+    change: int  # positive = pallets in, negative = pallets out
     notes: Optional[str] = None
 
-class PalletUpdate(BaseModel):
-    tree_color: Optional[str] = None
-    tree_species: Optional[str] = None
-    tree_size: Optional[str] = None
-    quantity: Optional[int] = None
-    location: Optional[str] = None
-    status: Optional[str] = None
-    yard_position: Optional[str] = None
-    notes: Optional[str] = None
+class ColorCreate(BaseModel):
+    color: str
+    label: Optional[str] = None  # display label e.g. "Nordmann Green"
 
-@api_router.get("/pallets")
-async def list_pallets(status: Optional[str] = None, color: Optional[str] = None, location: Optional[str] = None, user=Depends(get_current_user)):
-    query = {}
-    if status:
-        query["status"] = status
-    if color:
-        query["tree_color"] = color
-    if location:
-        query["location"] = location
-    pallets = await db.pallets.find(query).sort("created_at", -1).to_list(1000)
-    return [serialize_doc(p) for p in pallets]
+@api_router.get("/colours")
+async def list_colours(user=Depends(get_current_user)):
+    """List all colour codes with current stock"""
+    colours = await db.colours.find().sort("color", 1).to_list(50)
+    result = []
+    for c in colours:
+        cd = serialize_doc(c)
+        result.append(cd)
+    return result
 
-@api_router.post("/pallets")
-async def create_pallet(pallet: PalletCreate, user=Depends(get_current_user)):
-    doc = pallet.model_dump()
-    doc["status"] = "in_yard" if doc["location"] != "field" else "in_field"
-    doc["created_at"] = datetime.now(timezone.utc).isoformat()
-    doc["created_by"] = user["id"]
-    result = await db.pallets.insert_one(doc)
+@api_router.post("/colours")
+async def create_colour(data: ColorCreate, user=Depends(get_current_user)):
+    existing = await db.colours.find_one({"color": data.color.lower().strip()})
+    if existing:
+        raise HTTPException(status_code=400, detail="Colour already exists")
+    doc = {
+        "color": data.color.lower().strip(),
+        "label": data.label or data.color.capitalize(),
+        "quantity": 0,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    result = await db.colours.insert_one(doc)
     doc["id"] = str(result.inserted_id)
     doc.pop("_id", None)
     return doc
 
-@api_router.get("/pallets/{pallet_id}")
-async def get_pallet(pallet_id: str, user=Depends(get_current_user)):
-    pallet = await db.pallets.find_one({"_id": ObjectId(pallet_id)})
-    if not pallet:
-        raise HTTPException(status_code=404, detail="Pallet not found")
-    return serialize_doc(pallet)
-
-@api_router.put("/pallets/{pallet_id}")
-async def update_pallet(pallet_id: str, update: PalletUpdate, user=Depends(get_current_user)):
-    updates = {k: v for k, v in update.model_dump().items() if v is not None}
-    if not updates:
-        raise HTTPException(status_code=400, detail="No fields to update")
-    updates["updated_at"] = datetime.now(timezone.utc).isoformat()
-    await db.pallets.update_one({"_id": ObjectId(pallet_id)}, {"$set": updates})
-    pallet = await db.pallets.find_one({"_id": ObjectId(pallet_id)})
-    return serialize_doc(pallet)
-
-@api_router.delete("/pallets/{pallet_id}")
-async def delete_pallet(pallet_id: str, user=Depends(get_current_user)):
-    result = await db.pallets.delete_one({"_id": ObjectId(pallet_id)})
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Pallet not found")
+@api_router.delete("/colours/{colour_id}")
+async def delete_colour(colour_id: str, user=Depends(get_current_user)):
+    await db.colours.delete_one({"_id": ObjectId(colour_id)})
     return {"message": "Deleted"}
 
-# ── QR Code Endpoint ─────────────────────────────────────────
-@api_router.get("/pallets/{pallet_id}/qr")
-async def get_pallet_qr(pallet_id: str, user=Depends(get_current_user)):
+@api_router.post("/stock/adjust")
+async def adjust_stock(adj: StockAdjust, user=Depends(get_current_user)):
+    """Add or remove pallets for a colour. Positive = in, negative = out."""
+    color = adj.color.lower().strip()
+    colour_doc = await db.colours.find_one({"color": color})
+    if not colour_doc:
+        raise HTTPException(status_code=404, detail=f"Colour '{color}' not found. Add it first.")
+    new_qty = colour_doc.get("quantity", 0) + adj.change
+    if new_qty < 0:
+        raise HTTPException(status_code=400, detail=f"Not enough stock. Current: {colour_doc.get('quantity', 0)}")
+    await db.colours.update_one({"color": color}, {"$set": {"quantity": new_qty}})
+    # Log the movement
+    movement = {
+        "color": color,
+        "change": adj.change,
+        "type": "in" if adj.change > 0 else "out",
+        "quantity_after": new_qty,
+        "notes": adj.notes or "",
+        "user_id": user["id"],
+        "user_name": user.get("name", ""),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.stock_movements.insert_one(movement)
+    return {"color": color, "quantity": new_qty, "change": adj.change}
+
+@api_router.get("/stock/movements")
+async def list_stock_movements(color: Optional[str] = None, limit: int = 50, user=Depends(get_current_user)):
+    query = {}
+    if color:
+        query["color"] = color.lower().strip()
+    movements = await db.stock_movements.find(query).sort("created_at", -1).to_list(limit)
+    return [serialize_doc(m) for m in movements]
+
+# ── QR Code Endpoint (per colour) ────────────────────────────
+@api_router.get("/colours/{color}/qr")
+async def get_colour_qr(color: str, user=Depends(get_current_user)):
     import qrcode
-    pallet = await db.pallets.find_one({"_id": ObjectId(pallet_id)})
-    if not pallet:
-        raise HTTPException(status_code=404, detail="Pallet not found")
-    qr_data = f"PALLET:{pallet_id}|NUM:{pallet.get('pallet_number','')}|COLOR:{pallet.get('tree_color','')}|QTY:{pallet.get('quantity','')}"
+    colour_doc = await db.colours.find_one({"color": color.lower().strip()})
+    if not colour_doc:
+        raise HTTPException(status_code=404, detail="Colour not found")
+    qr_data = f"WC-TMS|COLOR:{color.upper()}"
     qr = qrcode.QRCode(version=1, box_size=10, border=4)
     qr.add_data(qr_data)
     qr.make(fit=True)
@@ -245,7 +254,7 @@ async def get_pallet_qr(pallet_id: str, user=Depends(get_current_user)):
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     buf.seek(0)
-    return {"qr_base64": base64.b64encode(buf.read()).decode(), "qr_data": qr_data}
+    return {"qr_base64": base64.b64encode(buf.read()).decode(), "qr_data": qr_data, "color": color, "label": colour_doc.get("label", color)}
 
 # ── Yard Locations ───────────────────────────────────────────
 class YardLocationCreate(BaseModel):
@@ -332,16 +341,11 @@ async def delete_order(order_id: str, user=Depends(get_current_user)):
 # ── Stock Check ──────────────────────────────────────────────
 @api_router.get("/stock/check")
 async def check_stock(user=Depends(get_current_user)):
-    """Returns available stock grouped by color and size"""
-    pipeline = [
-        {"$match": {"status": {"$in": ["in_yard", "in_field"]}}},
-        {"$group": {"_id": {"color": "$tree_color", "size": "$tree_size"}, "total_quantity": {"$sum": "$quantity"}, "pallet_count": {"$sum": 1}}}
-    ]
-    results = await db.pallets.aggregate(pipeline).to_list(100)
+    """Returns available stock by colour"""
+    colours = await db.colours.find().to_list(50)
     stock = {}
-    for r in results:
-        key = f"{r['_id']['color']}_{r['_id']['size']}"
-        stock[key] = {"color": r["_id"]["color"], "size": r["_id"]["size"], "total_quantity": r["total_quantity"], "pallet_count": r["pallet_count"]}
+    for c in colours:
+        stock[c["color"]] = {"color": c["color"], "label": c.get("label", c["color"]), "quantity": c.get("quantity", 0)}
     return stock
 
 @api_router.post("/orders/{order_id}/check-fulfillment")
@@ -352,15 +356,12 @@ async def check_order_fulfillment(order_id: str, user=Depends(get_current_user))
     results = []
     can_fulfill = True
     for item in order.get("items", []):
-        available = await db.pallets.aggregate([
-            {"$match": {"tree_color": item["tree_color"], "tree_size": item.get("tree_size", "6ft"), "status": {"$in": ["in_yard"]}}},
-            {"$group": {"_id": None, "total": {"$sum": "$quantity"}}}
-        ]).to_list(1)
-        avail_qty = available[0]["total"] if available else 0
+        colour_doc = await db.colours.find_one({"color": item["tree_color"].lower().strip()})
+        avail_qty = colour_doc.get("quantity", 0) if colour_doc else 0
         ok = avail_qty >= item["quantity"]
         if not ok:
             can_fulfill = False
-        results.append({"tree_color": item["tree_color"], "tree_size": item.get("tree_size", "6ft"), "requested": item["quantity"], "available": avail_qty, "can_fulfill": ok})
+        results.append({"tree_color": item["tree_color"], "requested": item["quantity"], "available": avail_qty, "can_fulfill": ok})
     return {"can_fulfill": can_fulfill, "items": results}
 
 # ── Lorries ──────────────────────────────────────────────────
@@ -395,8 +396,9 @@ class LoadDestination(BaseModel):
     order_id: Optional[str] = None
     notes: Optional[str] = None
 
-class LoadPallet(BaseModel):
-    pallet_id: str
+class LoadPalletItem(BaseModel):
+    color: str
+    quantity: int
     position: str  # e.g. "A1", "B3" etc.
 
 class LoadCreate(BaseModel):
@@ -408,7 +410,7 @@ class LoadCreate(BaseModel):
 
 class LoadUpdate(BaseModel):
     status: Optional[str] = None
-    pallets: Optional[List[LoadPallet]] = None
+    pallets: Optional[List[LoadPalletItem]] = None
     destinations: Optional[List[LoadDestination]] = None
     notes: Optional[str] = None
 
@@ -567,6 +569,35 @@ async def startup():
     existing = await db.users.find_one({"email": admin_email})
     if existing is None:
         await db.users.insert_one({
+            "email": admin_email,
+            "password_hash": hash_password(admin_password),
+            "name": "Admin",
+            "role": "admin",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
+        logger.info(f"Admin user seeded: {admin_email}")
+    elif not verify_password(admin_password, existing["password_hash"]):
+        await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_password(admin_password)}})
+        logger.info("Admin password updated")
+    # Write credentials
+    Path("/app/memory").mkdir(exist_ok=True)
+    with open("/app/memory/test_credentials.md", "w") as f:
+        f.write(f"# Test Credentials\n\n## Admin\n- Email: {admin_email}\n- Password: {admin_password}\n- Role: admin\n\n## Auth Endpoints\n- POST /api/auth/login\n- POST /api/auth/register\n- GET /api/auth/me\n- POST /api/auth/logout\n")
+
+app.include_router(api_router)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[os.environ.get("FRONTEND_URL", "http://localhost:3000")],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.on_event("shutdown")
+async def shutdown_db_client():
+    client.close()
+sers.insert_one({
             "email": admin_email,
             "password_hash": hash_password(admin_password),
             "name": "Admin",
