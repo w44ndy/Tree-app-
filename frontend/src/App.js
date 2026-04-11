@@ -9,7 +9,6 @@ import PalletsPage from './pages/PalletsPage';
 import YardPage from './pages/YardPage';
 import OrdersPage from './pages/OrdersPage';
 import LoadsPage from './pages/LoadsPage';
-import LorriesPage from './pages/LorriesPage';
 import './App.css';
 
 const WC_LOGO = "https://customer-assets.emergentagent.com/job_tree-logistics/artifacts/7lohxwsd_2025Logo.png";
@@ -44,7 +43,6 @@ function AppRoutes() {
       <Route path="/yard" element={<ProtectedRoute><YardPage /></ProtectedRoute>} />
       <Route path="/orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
       <Route path="/loads" element={<ProtectedRoute><LoadsPage /></ProtectedRoute>} />
-      <Route path="/lorries" element={<ProtectedRoute><LorriesPage /></ProtectedRoute>} />
     </Routes>
   );
 }

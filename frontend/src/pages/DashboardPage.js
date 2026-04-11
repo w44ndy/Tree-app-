@@ -39,10 +39,10 @@ export default function DashboardPage() {
 
   const statCards = stats ? [
     { label: 'Total Pallets', value: stats.total_pallets, icon: Package, color: '#1A4331' },
-    { label: 'Total Trees', value: (stats.total_pallets * 100).toLocaleString(), icon: TreePine, color: '#286646' },
-    { label: 'Active Loads', value: stats.active_loads, icon: Truck, color: '#E27B58' },
+    { label: 'Total Trees', value: stats.total_trees?.toLocaleString(), icon: TreePine, color: '#286646' },
+    { label: 'Active Collections', value: stats.active_collections, icon: Truck, color: '#E27B58' },
     { label: 'Pending Orders', value: stats.pending_orders, icon: ClipboardList, color: '#EAB308' },
-    { label: 'Lorries Available', value: `${stats.available_lorries}/${stats.total_lorries}`, icon: Truck, color: '#3B82F6' },
+    { label: 'Delivered', value: stats.delivered_collections, icon: TrendingUp, color: '#64748b' },
   ] : [];
 
   const chartData = stats?.stock_by_color?.map(s => ({

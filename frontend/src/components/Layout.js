@@ -14,8 +14,7 @@ const navItems = [
   { path: '/pallets', label: 'Stock', icon: Package },
   { path: '/yard', label: 'Yard & Stock', icon: MapPin },
   { path: '/orders', label: 'Orders', icon: ClipboardList },
-  { path: '/loads', label: 'Loads', icon: BoxesIcon },
-  { path: '/lorries', label: 'Lorries', icon: Truck },
+  { path: '/loads', label: 'Collections', icon: Truck },
 ];
 
 export default function Layout({ children }) {

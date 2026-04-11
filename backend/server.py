@@ -390,29 +390,28 @@ async def delete_lorry(lorry_id: str, user=Depends(get_current_user)):
     await db.lorries.delete_one({"_id": ObjectId(lorry_id)})
     return {"message": "Deleted"}
 
-# ── Loads ────────────────────────────────────────────────────
+# ── Collections (Loads) ──────────────────────────────────────
 class LoadDestination(BaseModel):
     address: str
-    order_id: Optional[str] = None
     notes: Optional[str] = None
 
-class LoadPalletItem(BaseModel):
+class PalletRequirement(BaseModel):
     color: str
     quantity: int
-    position: str  # e.g. "A1", "B3" etc.
 
 class LoadCreate(BaseModel):
-    lorry_id: str
+    lorry_id: Optional[str] = None
     destinations: List[LoadDestination]
     departure_date: Optional[str] = None
     driver_name: Optional[str] = None
     notes: Optional[str] = None
+    pallets_required: Optional[List[PalletRequirement]] = None
 
 class LoadUpdate(BaseModel):
     status: Optional[str] = None
-    pallets: Optional[List[LoadPalletItem]] = None
     destinations: Optional[List[LoadDestination]] = None
     notes: Optional[str] = None
+    pallets_required: Optional[List[PalletRequirement]] = None
 
 @api_router.get("/loads")
 async def list_loads(status: Optional[str] = None, user=Depends(get_current_user)):
@@ -432,8 +431,6 @@ async def create_load(load: LoadCreate, user=Depends(get_current_user)):
     result = await db.loads.insert_one(doc)
     doc["id"] = str(result.inserted_id)
     doc.pop("_id", None)
-    # Update lorry status
-    await db.lorries.update_one({"_id": ObjectId(load.lorry_id)}, {"$set": {"status": "loading"}})
     return doc
 
 @api_router.get("/loads/{load_id}")
@@ -446,27 +443,27 @@ async def get_load(load_id: str, user=Depends(get_current_user)):
 @api_router.put("/loads/{load_id}")
 async def update_load(load_id: str, update: LoadUpdate, user=Depends(get_current_user)):
     updates = {k: v for k, v in update.model_dump().items() if v is not None}
-    if "pallets" in updates:
-        updates["pallets"] = [p if isinstance(p, dict) else p.model_dump() for p in updates["pallets"]]
     if "destinations" in updates:
         updates["destinations"] = [d if isinstance(d, dict) else d.model_dump() for d in updates["destinations"]]
+    if "pallets_required" in updates:
+        updates["pallets_required"] = [p if isinstance(p, dict) else p.model_dump() for p in updates["pallets_required"]]
     updates["updated_at"] = datetime.now(timezone.utc).isoformat()
     await db.loads.update_one({"_id": ObjectId(load_id)}, {"$set": updates})
-    # If status changed to loaded, update pallet statuses
+    # If dispatched, deduct stock
     if updates.get("status") == "in_transit":
         load = await db.loads.find_one({"_id": ObjectId(load_id)})
         if load:
-            for p in load.get("pallets", []):
-                await db.pallets.update_one({"_id": ObjectId(p["pallet_id"])}, {"$set": {"status": "loaded"}})
-            if load.get("lorry_id"):
-                await db.lorries.update_one({"_id": ObjectId(load["lorry_id"])}, {"$set": {"status": "in_transit"}})
-    if updates.get("status") == "delivered":
-        load = await db.loads.find_one({"_id": ObjectId(load_id)})
-        if load:
-            for p in load.get("pallets", []):
-                await db.pallets.update_one({"_id": ObjectId(p["pallet_id"])}, {"$set": {"status": "delivered"}})
-            if load.get("lorry_id"):
-                await db.lorries.update_one({"_id": ObjectId(load["lorry_id"])}, {"$set": {"status": "available"}})
+            for p in load.get("pallets_required", []):
+                color = p.get("color", "").lower().strip()
+                qty = p.get("quantity", 0)
+                if color and qty > 0:
+                    await db.colours.update_one({"color": color}, {"$inc": {"quantity": -qty}})
+                    await db.stock_movements.insert_one({
+                        "color": color, "change": -qty, "type": "out",
+                        "quantity_after": 0, "notes": f"Dispatched — collection {load_id}",
+                        "user_id": "", "user_name": "System",
+                        "created_at": datetime.now(timezone.utc).isoformat()
+                    })
     load = await db.loads.find_one({"_id": ObjectId(load_id)})
     return serialize_doc(load)
 
@@ -476,23 +473,16 @@ async def dashboard_stats(user=Depends(get_current_user)):
     colours = await db.colours.find().to_list(50)
     total_pallets = sum(c.get("quantity", 0) for c in colours)
     pending_orders = await db.orders.count_documents({"status": "pending"})
-    active_loads = await db.loads.count_documents({"status": {"$in": ["loading", "in_transit"]}})
-    total_lorries = await db.lorries.count_documents({})
-    available_lorries = await db.lorries.count_documents({"status": "available"})
-    total_movements = await db.stock_movements.count_documents({})
+    active_collections = await db.loads.count_documents({"status": {"$in": ["loading", "in_transit"]}})
+    delivered_collections = await db.loads.count_documents({"status": "delivered"})
 
     return {
         "total_pallets": total_pallets,
-        "in_yard": total_pallets,
-        "in_field": 0,
-        "loaded": 0,
-        "delivered": 0,
         "pending_orders": pending_orders,
-        "active_loads": active_loads,
-        "total_lorries": total_lorries,
-        "available_lorries": available_lorries,
-        "total_trees": total_pallets,
-        "stock_by_color": [{"color": c.get("color",""), "quantity": c.get("quantity",0), "pallets": c.get("quantity",0)} for c in colours]
+        "active_collections": active_collections,
+        "delivered_collections": delivered_collections,
+        "total_trees": total_pallets * 100,
+        "stock_by_color": [{"color": c.get("color",""), "quantity": c.get("quantity",0)} for c in colours]
     }
 
 # ── Manifest ─────────────────────────────────────────────────
