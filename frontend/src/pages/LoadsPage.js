@@ -322,7 +322,7 @@ export default function LoadsPage() {
             <div className="mt-4 space-y-4" id="manifest-print">
               <div className="border-b border-[#1A4331]/10 pb-4">
                 <div className="flex items-center gap-3">
-                  <img src="https://www.wilson-contractors.co.uk/favicon.ico" alt="Wilson Contractors" className="w-10 h-10 rounded-lg" />
+                  <img src="https://customer-assets.emergentagent.com/job_tree-logistics/artifacts/7lohxwsd_2025Logo.png" alt="Wilson Contractors" className="h-10 object-contain" />
                   <div>
                     <h2 className="text-xl font-bold font-['Outfit'] text-[#0A1711]">Wilson Contractors</h2>
                     <p className="text-sm text-[#4A5D53]">Tree Management System — Delivery Manifest</p>

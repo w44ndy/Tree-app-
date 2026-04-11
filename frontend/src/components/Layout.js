@@ -6,7 +6,7 @@ import {
   Truck, BoxesIcon, LogOut, User
 } from 'lucide-react';
 
-const WC_LOGO = "https://www.wilson-contractors.co.uk/favicon.ico";
+const WC_LOGO = "https://customer-assets.emergentagent.com/job_tree-logistics/artifacts/7lohxwsd_2025Logo.png";
 import { Button } from '../components/ui/button';
 
 const navItems = [
@@ -33,11 +33,7 @@ export default function Layout({ children }) {
       <aside className="w-64 bg-white/80 backdrop-blur-xl border-r border-[#1A4331]/15 flex flex-col no-print fixed h-full z-40" data-testid="sidebar">
         <div className="p-5 border-b border-[#1A4331]/10">
           <div className="flex items-center gap-3">
-            <img src={WC_LOGO} alt="Wilson Contractors" className="w-10 h-10 rounded-xl object-contain flex-shrink-0" />
-            <div className="min-w-0">
-              <h1 className="text-sm font-bold text-[#0A1711] font-['Outfit'] truncate">Wilson Contractors</h1>
-              <p className="text-[10px] text-[#4A5D53] tracking-wider uppercase">TMS</p>
-            </div>
+            <img src={WC_LOGO} alt="Wilson Contractors" className="h-9 object-contain flex-shrink-0" />
           </div>
         </div>
 

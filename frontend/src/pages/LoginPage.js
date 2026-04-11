@@ -5,7 +5,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Loader2, TreePine } from 'lucide-react';
 
-const WC_LOGO = "https://www.wilson-contractors.co.uk/favicon.ico";
+const WC_LOGO = "https://customer-assets.emergentagent.com/job_tree-logistics/artifacts/7lohxwsd_2025Logo.png";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -39,10 +39,9 @@ export default function LoginPage() {
         />
         <div className="absolute inset-0 bg-gradient-to-r from-[#1A4331]/80 to-[#1A4331]/40" />
         <div className="relative z-10 flex flex-col justify-end p-12 text-white">
-          <img src={WC_LOGO} alt="Wilson Contractors" className="w-16 h-16 rounded-xl mb-4 bg-white/10 p-1" />
-          <h1 className="text-4xl font-bold tracking-tight font-['Outfit']">Wilson Contractors</h1>
-          <p className="mt-2 text-lg opacity-90 font-['Work_Sans']">Tree Management System</p>
-          <p className="mt-1 text-sm opacity-70">Mains of Corsindae, Aberdeenshire</p>
+          <img src={WC_LOGO} alt="Wilson Contractors" className="h-16 object-contain mb-4 drop-shadow-lg" />
+          <h1 className="text-4xl font-bold tracking-tight font-['Outfit']">Tree Management System</h1>
+          <p className="mt-2 text-sm opacity-70">Mains of Corsindae, Aberdeenshire</p>
         </div>
       </div>
 
