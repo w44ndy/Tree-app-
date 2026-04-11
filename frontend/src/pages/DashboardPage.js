@@ -84,7 +84,7 @@ export default function DashboardPage() {
   const totalShortfall = fulfillmentSummary.reduce((sum, f) => sum + f.shortfall, 0);
 
   const FULL_LOAD = 10;
-  const totalFieldReady = Object.values(fieldStatus).reduce((s, v) => s + v, 0);
+  const totalFieldReady = colours.reduce((s, c) => s + (fieldStatus[c.color] || 0), 0);
   const fullLoads = Math.floor(totalFieldReady / FULL_LOAD);
   const fieldRemainder = totalFieldReady % FULL_LOAD;
 

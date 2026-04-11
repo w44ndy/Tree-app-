@@ -55,7 +55,7 @@ export default function TVDashboard() {
   const allGood = totalShortfall === 0;
 
   const FULL_LOAD = 10;
-  const totalFieldReady = Object.values(fieldStatus).reduce((s, v) => s + v, 0);
+  const totalFieldReady = colours.reduce((s, c) => s + (fieldStatus[c.color] || 0), 0);
   const fullLoads = Math.floor(totalFieldReady / FULL_LOAD);
 
   const fmtDate = (s) => {
@@ -114,10 +114,10 @@ export default function TVDashboard() {
             </div>
             {totalFieldReady > 0 && (
               <div className="flex gap-2 mt-2">
-                {Object.entries(fieldStatus).filter(([_, q]) => q > 0).map(([color, qty]) => (
-                  <div key={color} className="flex items-center gap-1">
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLOR_HEX[color] || '#fff' }} />
-                    <span className="text-xs text-white/60">{qty}</span>
+                {colours.filter(c => (fieldStatus[c.color] || 0) > 0).map(c => (
+                  <div key={c.color} className="flex items-center gap-1">
+                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLOR_HEX[c.color] || '#fff' }} />
+                    <span className="text-xs text-white/60">{fieldStatus[c.color]}</span>
                   </div>
                 ))}
               </div>

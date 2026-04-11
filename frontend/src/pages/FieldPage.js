@@ -51,7 +51,7 @@ export default function FieldPage() {
   };
 
   const totalPallets = Object.values(counts).reduce((s, v) => s + v, 0);
-  const totalReady = Object.values(fieldStatus).reduce((s, v) => s + v, 0);
+  const totalReady = colours.reduce((s, c) => s + (fieldStatus[c.color] || 0), 0);
   const fullLoads = Math.floor(totalReady / FULL_LOAD);
   const remainder = totalReady % FULL_LOAD;
 
