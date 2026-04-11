@@ -507,6 +507,11 @@ async def create_load(load: LoadCreate, user=Depends(get_current_user)):
     doc.pop("_id", None)
     return doc
 
+@api_router.delete("/loads/{load_id}")
+async def delete_load(load_id: str, user=Depends(get_current_user)):
+    await db.loads.delete_one({"_id": ObjectId(load_id)})
+    return {"message": "Deleted"}
+
 @api_router.get("/loads/{load_id}")
 async def get_load(load_id: str, user=Depends(get_current_user)):
     load = await db.loads.find_one({"_id": ObjectId(load_id)})

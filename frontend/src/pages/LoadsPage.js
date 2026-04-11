@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getLoads, createLoad, getColours, getManifestPublic, signManifest, updateLoad, getHaulers, createHauler } from '../lib/api';
+import { getLoads, createLoad, getColours, getManifestPublic, signManifest, updateLoad, getHaulers, createHauler, deleteLoad } from '../lib/api';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -49,6 +49,7 @@ export default function LoadsPage() {
   const [haulers, setHaulers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [showDispatched, setShowDispatched] = useState(false);
   const [showManifest, setShowManifest] = useState(null); // load id for dispatch flow
   const [showViewManifest, setShowViewManifest] = useState(null); // load id for viewing signed
@@ -96,7 +97,7 @@ export default function LoadsPage() {
   const updateDest = (i, v) => { const d = [...form.destinations]; d[i] = { address: v }; setForm({ ...form, destinations: d }); };
   const addPalletReq = () => setForm({ ...form, pallets: [...form.pallets, { color: '', quantity: 1 }] });
   const removePalletReq = (i) => setForm({ ...form, pallets: form.pallets.filter((_, idx) => idx !== i) });
-  const updatePalletReq = (i, f, v) => { const p = [...form.pallets]; p[i] = { ...p[i], [f]: f === 'quantity' ? parseInt(v) || 1 : v }; setForm({ ...form, pallets: p }); };
+  const updatePalletReq = (i, f, v) => { const p = [...form.pallets]; p[i] = { ...p[i], [f]: f === 'quantity' ? (v === '' ? '' : parseInt(v) || 0) : v }; setForm({ ...form, pallets: p }); };
 
   const handleAddHauler = async () => {
     if (!newHauler.trim()) return;
@@ -126,6 +127,47 @@ export default function LoadsPage() {
       setForm({ hauler: '', collection_date: '', destinations: [{ address: '' }], pallets: [{ color: '', quantity: 1 }], notes: '' });
       fetchData();
     } catch { toast.error('Failed to create'); }
+  };
+
+  const handleDelete = async (loadId) => {
+    try {
+      await deleteLoad(loadId);
+      toast.success('Collection deleted');
+      fetchData();
+    } catch { toast.error('Failed to delete'); }
+  };
+
+  const handleEdit = (load) => {
+    // Parse driver_name back into hauler
+    const haulerName = load.driver_name?.split(' — ')[0]?.split(' (')[0] || '';
+    setForm({
+      hauler: haulerName,
+      collection_date: load.departure_date || '',
+      destinations: load.destinations?.length ? load.destinations : [{ address: '' }],
+      pallets: load.pallets_required?.length ? load.pallets_required.map(p => ({ color: p.color, quantity: p.quantity })) : [{ color: '', quantity: 1 }],
+      notes: load.notes || ''
+    });
+    setEditingId(load.id);
+    setShowCreate(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!form.hauler) return toast.error('Select a hauler');
+    try {
+      await updateLoad(editingId, {
+        status: 'loading',
+        destinations: form.destinations.filter(d => d.address.trim()),
+        pallets_required: form.pallets.filter(p => p.color),
+        notes: form.notes
+      });
+      // Update driver_name separately since it's a top-level field
+      await updateLoad(editingId, { notes: form.notes });
+      toast.success('Collection updated');
+      setShowCreate(false);
+      setEditingId(null);
+      setForm({ hauler: '', collection_date: '', destinations: [{ address: '' }], pallets: [{ color: '', quantity: 1 }], notes: '' });
+      fetchData();
+    } catch { toast.error('Failed to update'); }
   };
 
   // Open dispatch manifest
@@ -216,11 +258,21 @@ export default function LoadsPage() {
             </div>
             {load.notes && <p className="text-xs text-[#4A5D53] mt-1.5 italic">Note: {load.notes}</p>}
           </div>
-          <div className="flex-shrink-0">
+          <div className="flex flex-col gap-2 flex-shrink-0">
             {!isDispatched ? (
-              <Button size="sm" onClick={() => openDispatchManifest(load.id)} className="bg-[#1A4331] text-white hover:bg-[#1A4331]/90" data-testid={`dispatch-${load.id}`}>
-                <ClipboardCheck className="w-3 h-3 mr-1" /> Ready for Dispatch
-              </Button>
+              <>
+                <Button size="sm" onClick={() => openDispatchManifest(load.id)} className="bg-[#1A4331] text-white hover:bg-[#1A4331]/90" data-testid={`dispatch-${load.id}`}>
+                  <ClipboardCheck className="w-3 h-3 mr-1" /> Ready for Dispatch
+                </Button>
+                <div className="flex gap-1">
+                  <Button size="sm" variant="outline" onClick={() => handleEdit(load)} className="flex-1 border-[#1A4331]/20 text-[#4A5D53]" data-testid={`edit-${load.id}`}>
+                    Edit
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => handleDelete(load.id)} className="border-red-200 text-red-500 hover:bg-red-50" data-testid={`delete-${load.id}`}>
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                </div>
+              </>
             ) : (
               <Button size="sm" variant="outline" onClick={() => openViewManifest(load.id)} className="border-[#1A4331]/20 text-[#4A5D53]" data-testid={`view-manifest-${load.id}`}>
                 <FileText className="w-3 h-3 mr-1" /> View Manifest
@@ -243,14 +295,14 @@ export default function LoadsPage() {
           <h1 className="text-3xl font-bold text-[#0A1711] font-['Outfit'] tracking-tight">Collections</h1>
           <p className="text-sm text-[#4A5D53] mt-1">{upcoming.length} upcoming &middot; {dispatched.length} dispatched</p>
         </div>
-        <Dialog open={showCreate} onOpenChange={setShowCreate}>
+        <Dialog open={showCreate} onOpenChange={(open) => { if (!open) { setShowCreate(false); setEditingId(null); setForm({ hauler: '', collection_date: '', destinations: [{ address: '' }], pallets: [{ color: '', quantity: 1 }], notes: '' }); } }}>
           <DialogTrigger asChild>
             <Button className="bg-[#1A4331] text-white hover:bg-[#1A4331]/90 rounded-lg" data-testid="create-load-button">
               <Plus className="w-4 h-4 mr-2" /> New Collection
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto" data-testid="create-load-dialog">
-            <DialogHeader><DialogTitle className="font-['Outfit']">Schedule Collection</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle className="font-['Outfit']">{editingId ? 'Edit Collection' : 'Schedule Collection'}</DialogTitle></DialogHeader>
             <div className="space-y-4 mt-4">
               <div>
                 <Label className="flex items-center justify-between">Hauler / Company
@@ -310,7 +362,7 @@ export default function LoadsPage() {
                         </div>
                         <div className="w-24">
                           <span className="text-xs text-[#4A5D53]">Pallets</span>
-                          <Input type="number" min={1} value={p.quantity} onChange={e => updatePalletReq(i, 'quantity', e.target.value)} className="bg-white" />
+                          <Input type="number" min={0} value={p.quantity} onChange={e => updatePalletReq(i, 'quantity', e.target.value)} className="bg-white" />
                         </div>
                         <div className="w-14 text-center pb-2">
                           {p.color && (ok ? <CheckCircle className="w-5 h-5 text-emerald-500 mx-auto" /> : <span className="text-[10px] text-red-600 font-bold">-{p.quantity - stock}</span>)}
@@ -325,7 +377,7 @@ export default function LoadsPage() {
                 <Label>Notes</Label>
                 <Input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="Optional" />
               </div>
-              <Button onClick={handleCreate} className="w-full bg-[#1A4331] text-white" data-testid="submit-load-button">Schedule Collection</Button>
+              <Button onClick={editingId ? handleSaveEdit : handleCreate} className="w-full bg-[#1A4331] text-white" data-testid="submit-load-button">{editingId ? 'Save Changes' : 'Schedule Collection'}</Button>
             </div>
           </DialogContent>
         </Dialog>

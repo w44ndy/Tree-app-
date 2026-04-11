@@ -55,6 +55,7 @@ export const getLoads = (params) => api.get('/loads', { params });
 export const createLoad = (data) => api.post('/loads', data);
 export const getLoad = (id) => api.get(`/loads/${id}`);
 export const updateLoad = (id, data) => api.put(`/loads/${id}`, data);
+export const deleteLoad = (id) => api.delete(`/loads/${id}`);
 export const addPalletToLoad = (loadId, data) => api.post(`/loads/${loadId}/add-pallet`, data);
 export const removePalletFromLoad = (loadId, position) => api.post(`/loads/${loadId}/remove-pallet`, null, { params: { position } });
 export const getManifest = (loadId) => api.get(`/loads/${loadId}/manifest`);

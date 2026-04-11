@@ -50,8 +50,17 @@ export default function DashboardPage() {
     .filter(l => l.status === 'loading')
     .sort((a, b) => (a.departure_date || '').localeCompare(b.departure_date || ''));
 
+  // Next 7 days filter for "Required" KPI
+  const now = new Date();
+  const in7days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const next7dayCollections = upcomingCollections.filter(l => {
+    if (!l.departure_date) return false;
+    const d = new Date(l.departure_date + 'T00:00:00');
+    return d <= in7days;
+  });
+
   const stockRequired = {};
-  upcomingCollections.forEach(load => {
+  next7dayCollections.forEach(load => {
     (load.pallets_required || []).forEach(p => {
       const color = p.color?.toLowerCase();
       if (!color) return;
@@ -104,11 +113,11 @@ export default function DashboardPage() {
             </div>
             <div className="stat-card cursor-pointer" onClick={() => navigate('/loads')}>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[9px] uppercase tracking-[0.15em] font-bold text-[#4A5D53]">Required</span>
+                <span className="text-[9px] uppercase tracking-[0.15em] font-bold text-[#4A5D53]">Next 7 Days</span>
                 <TreePine className="w-3.5 h-3.5 text-[#E27B58]" />
               </div>
               <p className="text-xl font-bold text-[#0A1711] font-['Outfit']">{totalNeeded}</p>
-              <p className="text-[10px] text-[#4A5D53]">for {upcomingCollections.length} collections</p>
+              <p className="text-[10px] text-[#4A5D53]">pallets for {next7dayCollections.length} collection{next7dayCollections.length !== 1 ? 's' : ''}</p>
             </div>
             <div className="stat-card cursor-pointer" onClick={() => navigate('/pallets')}>
               <div className="flex items-center justify-between mb-1">
