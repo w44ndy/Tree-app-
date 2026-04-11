@@ -22,6 +22,7 @@ export const adjustStock = (data) => api.post('/stock/adjust', data);
 export const getStockMovements = (params) => api.get('/stock/movements', { params });
 export const getColourQR = (color) => api.get(`/colours/${color}/qr`);
 export const checkStock = () => api.get('/stock/check');
+export const getTotalCollected = () => api.get('/stock/total-collected');
 
 // Yard Locations
 export const getYardLocations = () => api.get('/yard-locations');

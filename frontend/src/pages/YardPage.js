@@ -1,17 +1,15 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { getYardLocations, createYardLocation, deleteYardLocation, getColours } from '../lib/api';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { getYardLocations, createYardLocation, deleteYardLocation, getColours, getTotalCollected } from '../lib/api';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Plus, Trash2, MapPin, Package, Edit, Save, X } from 'lucide-react';
+import { Plus, Trash2, MapPin, Package, X, RotateCw, TreePine, TruckIcon } from 'lucide-react';
 import { toast } from 'sonner';
-import { MapContainer, TileLayer, Marker, Popup, Rectangle, useMapEvents, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Polygon, useMapEvents, useMap, Marker } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-// Fix Leaflet default icon
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
@@ -19,146 +17,152 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 });
 
-const YARD_CENTER = [57.150, -2.500]; // Mains of Corsindae
-const COLOR_BG = { green: '#16a34a', blue: '#2563eb', silver: '#6b7280', red: '#dc2626', gold: '#ca8a04' };
-
-// Bay colours for the map
+const YARD_CENTER = [57.150, -2.500];
+const COLOR_MAP = { green: '#16a34a', blue: '#2563eb', silver: '#6b7280', red: '#dc2626', gold: '#ca8a04' };
 const BAY_COLORS = ['#16a34a', '#2563eb', '#dc2626', '#ca8a04', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
 
-function DrawBayTool({ isDrawing, onBayDrawn }) {
-  const [start, setStart] = useState(null);
-  const [current, setCurrent] = useState(null);
+// Rotate a point around a center by angle (degrees)
+function rotatePoint(center, point, angleDeg) {
+  const angle = (angleDeg * Math.PI) / 180;
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const dx = point[0] - center[0];
+  const dy = point[1] - center[1];
+  return [
+    center[0] + dx * cos - dy * sin,
+    center[1] + dx * sin + dy * cos,
+  ];
+}
+
+// Create a rotated rectangle from center, width, height, angle
+function makeRotatedRect(center, width, height, angleDeg) {
+  const hw = width / 2;
+  const hh = height / 2;
+  const corners = [
+    [center[0] - hh, center[1] - hw],
+    [center[0] - hh, center[1] + hw],
+    [center[0] + hh, center[1] + hw],
+    [center[0] + hh, center[1] - hw],
+  ];
+  return corners.map(c => rotatePoint(center, c, angleDeg));
+}
+
+function DrawPolygonTool({ isDrawing, onPolygonDrawn, onCancel }) {
+  const [points, setPoints] = useState([]);
+  const map = useMap();
+
+  useEffect(() => {
+    if (isDrawing) {
+      map.dragging.disable();
+      map.getContainer().style.cursor = 'crosshair';
+    } else {
+      map.dragging.enable();
+      map.getContainer().style.cursor = '';
+      setPoints([]);
+    }
+    return () => {
+      map.dragging.enable();
+      map.getContainer().style.cursor = '';
+    };
+  }, [isDrawing, map]);
 
   useMapEvents({
     click(e) {
       if (!isDrawing) return;
-      if (!start) {
-        setStart(e.latlng);
-      } else {
-        onBayDrawn([
-          [Math.min(start.lat, e.latlng.lat), Math.min(start.lng, e.latlng.lng)],
-          [Math.max(start.lat, e.latlng.lat), Math.max(start.lng, e.latlng.lng)]
-        ]);
-        setStart(null);
-        setCurrent(null);
-      }
-    },
-    mousemove(e) {
-      if (isDrawing && start) {
-        setCurrent(e.latlng);
+      const newPoints = [...points, [e.latlng.lat, e.latlng.lng]];
+      setPoints(newPoints);
+      // Auto-close at 4 points (rectangle)
+      if (newPoints.length >= 4) {
+        onPolygonDrawn(newPoints);
+        setPoints([]);
       }
     }
   });
 
-  if (start && current) {
-    return (
-      <Rectangle
-        bounds={[
-          [Math.min(start.lat, current.lat), Math.min(start.lng, current.lng)],
-          [Math.max(start.lat, current.lat), Math.max(start.lng, current.lng)]
-        ]}
-        pathOptions={{ color: '#1A4331', weight: 2, fillOpacity: 0.2, dashArray: '5,5' }}
-      />
-    );
+  if (!isDrawing || points.length === 0) return null;
+
+  // Show the polygon being drawn
+  if (points.length >= 2) {
+    return <Polygon positions={points} pathOptions={{ color: '#1A4331', weight: 2, fillOpacity: 0.2, dashArray: '6,4' }} />;
   }
   return null;
 }
 
-function BayRectangle({ bay, onDelete, stock, colours }) {
-  if (!bay.bounds) return null;
-  const bounds = bay.bounds;
-  const colorIdx = bay.colorIndex || 0;
-  const bayColor = BAY_COLORS[colorIdx % BAY_COLORS.length];
-
-  // Calculate stock in this bay
-  const bayStock = stock || bay.current_stock || 0;
-
-  // Get colour breakdown for this bay
-  const colourBreakdown = colours?.filter(c => c.quantity > 0) || [];
+function BayPolygon({ bay, onDelete, idx }) {
+  const bayColor = BAY_COLORS[idx % BAY_COLORS.length];
+  const positions = bay.polygon || bay.bounds;
+  if (!positions || positions.length < 3) return null;
 
   return (
-    <Rectangle
-      bounds={bounds}
+    <Polygon
+      positions={positions}
       pathOptions={{
         color: bayColor,
         weight: 3,
         fillColor: bayColor,
-        fillOpacity: bayStock > 0 ? 0.35 : 0.15,
+        fillOpacity: (bay.current_stock || 0) > 0 ? 0.35 : 0.15,
       }}
     >
-      <Popup>
-        <div className="min-w-[160px]">
-          <h3 className="font-bold text-base font-['Outfit'] mb-1">{bay.name}</h3>
-          <p className="text-xs text-gray-500 mb-2">Section {bay.section}</p>
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-sm">Pallets:</span>
-            <span className="text-lg font-bold">{bayStock} / {bay.capacity}</span>
-          </div>
-          <div className="text-xs text-gray-500 mb-2">{bayStock * 100} trees</div>
-          {bay.description && <p className="text-xs text-gray-600 mb-2">{bay.description}</p>}
-          <button
-            onClick={() => onDelete(bay.id)}
-            className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 mt-1"
-          >
-            <Trash2 size={12} /> Remove Bay
-          </button>
-        </div>
-      </Popup>
-    </Rectangle>
+    </Polygon>
   );
 }
 
-function BayLabel({ bay, stock }) {
-  const map = useMap();
-  const markerRef = useRef(null);
+function BayLabel({ bay, idx }) {
+  const positions = bay.polygon || bay.bounds;
+  if (!positions || positions.length < 3) return null;
 
-  if (!bay.bounds) return null;
+  // Calculate centroid
+  const center = positions.reduce(
+    (acc, p) => [acc[0] + p[0] / positions.length, acc[1] + p[1] / positions.length],
+    [0, 0]
+  );
 
-  const center = [
-    (bay.bounds[0][0] + bay.bounds[1][0]) / 2,
-    (bay.bounds[0][1] + bay.bounds[1][1]) / 2,
-  ];
-
-  const bayStock = stock || bay.current_stock || 0;
+  const bayColor = BAY_COLORS[idx % BAY_COLORS.length];
+  const stock = bay.current_stock || 0;
 
   const icon = L.divIcon({
     className: 'bay-label-icon',
     html: `<div style="
       background: rgba(255,255,255,0.95);
-      border: 2px solid #1A4331;
+      border: 2px solid ${bayColor};
       border-radius: 8px;
-      padding: 4px 8px;
+      padding: 4px 10px;
       text-align: center;
       font-family: Outfit, sans-serif;
-      min-width: 60px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      min-width: 70px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      pointer-events: none;
     ">
-      <div style="font-size: 10px; font-weight: 600; color: #1A4331; text-transform: uppercase; letter-spacing: 0.5px;">${bay.name}</div>
-      <div style="font-size: 18px; font-weight: 800; color: #0A1711;">${bayStock}</div>
+      <div style="font-size: 10px; font-weight: 700; color: ${bayColor}; text-transform: uppercase; letter-spacing: 0.5px;">${bay.name}</div>
+      <div style="font-size: 20px; font-weight: 800; color: #0A1711; line-height: 1.1;">${stock}</div>
       <div style="font-size: 9px; color: #4A5D53;">pallets</div>
     </div>`,
     iconSize: [80, 60],
     iconAnchor: [40, 30],
   });
 
-  return <Marker position={center} icon={icon} ref={markerRef} />;
+  return <Marker position={center} icon={icon} interactive={false} />;
 }
 
 export default function YardPage() {
   const [locations, setLocations] = useState([]);
   const [colours, setColours] = useState([]);
+  const [collected, setCollected] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isDrawing, setIsDrawing] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [pendingBounds, setPendingBounds] = useState(null);
+  const [pendingPolygon, setPendingPolygon] = useState(null);
   const [form, setForm] = useState({ name: '', section: 'A', capacity: 20, description: '' });
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [locRes, colRes] = await Promise.all([getYardLocations(), getColours()]);
+      const [locRes, colRes, collRes] = await Promise.all([
+        getYardLocations(), getColours(), getTotalCollected()
+      ]);
       setLocations(locRes.data);
       setColours(colRes.data);
+      setCollected(collRes.data);
     } catch (err) {
       toast.error('Failed to fetch yard data');
     } finally {
@@ -168,8 +172,8 @@ export default function YardPage() {
 
   useEffect(() => { fetchData(); }, []);
 
-  const handleBayDrawn = (bounds) => {
-    setPendingBounds(bounds);
+  const handlePolygonDrawn = (points) => {
+    setPendingPolygon(points);
     setIsDrawing(false);
     setShowCreateDialog(true);
   };
@@ -177,15 +181,14 @@ export default function YardPage() {
   const handleCreateBay = async () => {
     if (!form.name.trim()) return toast.error('Enter a bay name');
     try {
-      const bayData = {
+      await createYardLocation({
         ...form,
-        bounds: pendingBounds,
+        polygon: pendingPolygon,
         colorIndex: locations.length
-      };
-      await createYardLocation(bayData);
+      });
       toast.success(`Bay "${form.name}" created`);
       setShowCreateDialog(false);
-      setPendingBounds(null);
+      setPendingPolygon(null);
       setForm({ name: '', section: 'A', capacity: 20, description: '' });
       fetchData();
     } catch (err) {
@@ -210,30 +213,58 @@ export default function YardPage() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-bold text-[#0A1711] font-['Outfit'] tracking-tight">Yard Map</h1>
-          <p className="text-sm text-[#4A5D53] mt-1">Mains of Corsindae — draw bays on the map to track stock</p>
+          <p className="text-sm text-[#4A5D53] mt-1">Mains of Corsindae — click 4 corners to draw a bay</p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="bg-white border border-[#1A4331]/15 rounded-xl px-4 py-2">
-            <span className="text-[10px] uppercase tracking-wider text-[#4A5D53] font-bold">Total</span>
-            <p className="text-lg font-bold text-[#0A1711] font-['Outfit']">{totalStock} pallets</p>
-          </div>
           <Button
-            onClick={() => setIsDrawing(!isDrawing)}
+            onClick={() => { setIsDrawing(!isDrawing); }}
             className={`rounded-lg ${isDrawing ? 'bg-red-600 hover:bg-red-700' : 'bg-[#1A4331] hover:bg-[#1A4331]/90'} text-white`}
             data-testid="draw-bay-button"
           >
-            {isDrawing ? (
-              <><X className="w-4 h-4 mr-2" /> Cancel Drawing</>
-            ) : (
-              <><Plus className="w-4 h-4 mr-2" /> Draw Bay</>
-            )}
+            {isDrawing ? <><X className="w-4 h-4 mr-2" /> Cancel</> : <><Plus className="w-4 h-4 mr-2" /> Draw Bay</>}
           </Button>
+        </div>
+      </div>
+
+      {/* Stats row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="stat-card">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-[#4A5D53]">In Stock</span>
+            <Package className="w-4 h-4 text-[#1A4331]" />
+          </div>
+          <p className="text-2xl font-bold text-[#0A1711] font-['Outfit']">{totalStock}</p>
+          <p className="text-xs text-[#4A5D53]">{(totalStock * 100).toLocaleString()} trees</p>
+        </div>
+        <div className="stat-card">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-[#4A5D53]">Received from Field</span>
+            <TreePine className="w-4 h-4 text-emerald-600" />
+          </div>
+          <p className="text-2xl font-bold text-[#0A1711] font-['Outfit']">{collected?.total_received_pallets || 0}</p>
+          <p className="text-xs text-[#4A5D53]">{(collected?.total_received_trees || 0).toLocaleString()} trees total</p>
+        </div>
+        <div className="stat-card">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-[#4A5D53]">Collected from Site</span>
+            <TruckIcon className="w-4 h-4 text-[#E27B58]" />
+          </div>
+          <p className="text-2xl font-bold text-[#0A1711] font-['Outfit']">{collected?.total_collected_pallets || 0}</p>
+          <p className="text-xs text-[#4A5D53]">{(collected?.total_collected_trees || 0).toLocaleString()} trees dispatched</p>
+        </div>
+        <div className="stat-card">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-[#4A5D53]">Bays</span>
+            <MapPin className="w-4 h-4 text-[#1A4331]" />
+          </div>
+          <p className="text-2xl font-bold text-[#0A1711] font-['Outfit']">{locations.length}</p>
+          <p className="text-xs text-[#4A5D53]">configured on map</p>
         </div>
       </div>
 
       {isDrawing && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
-          <strong>Drawing mode:</strong> Click two corners on the map to draw a bay rectangle. Click the first corner, then the opposite corner.
+          <strong>Drawing mode:</strong> Click 4 corners on the map to outline your bay. The shape will close automatically. Bays can be any angle — just click the corners as they are on the ground.
         </div>
       )}
 
@@ -254,35 +285,32 @@ export default function YardPage() {
             url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
             maxZoom={19}
           />
-
-          <DrawBayTool isDrawing={isDrawing} onBayDrawn={handleBayDrawn} />
-
-          {locations.map((loc) => (
+          <DrawPolygonTool
+            isDrawing={isDrawing}
+            onPolygonDrawn={handlePolygonDrawn}
+            onCancel={() => setIsDrawing(false)}
+          />
+          {locations.map((loc, idx) => (
             <React.Fragment key={loc.id}>
-              <BayRectangle bay={loc} onDelete={handleDelete} stock={loc.current_stock} colours={colours} />
-              <BayLabel bay={loc} stock={loc.current_stock} />
+              <BayPolygon bay={loc} onDelete={handleDelete} idx={idx} />
+              <BayLabel bay={loc} idx={idx} />
             </React.Fragment>
           ))}
         </MapContainer>
       </div>
 
-      {/* Stock Summary Cards */}
+      {/* Stock by Colour */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4" data-testid="stock-overview">
         {colours.map((c) => (
           <div key={c.id} className="bg-white border border-[#1A4331]/15 rounded-xl p-4">
             <div className="flex items-center gap-2 mb-2">
-              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLOR_BG[c.color] || '#1A4331' }} />
+              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLOR_MAP[c.color] || '#1A4331' }} />
               <span className="text-sm font-semibold capitalize text-[#0A1711]">{c.label || c.color}</span>
             </div>
             <p className="text-2xl font-bold text-[#0A1711] font-['Outfit']">{c.quantity || 0}</p>
             <p className="text-xs text-[#4A5D53]">{(c.quantity || 0) * 100} trees</p>
           </div>
         ))}
-        {colours.length === 0 && !loading && (
-          <div className="col-span-full text-center py-6 text-[#4A5D53] text-sm">
-            No colours set up yet. Add colours on the Stock page first.
-          </div>
-        )}
       </div>
 
       {/* Bay List */}
@@ -292,7 +320,6 @@ export default function YardPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {locations.map((loc, idx) => {
               const bayColor = BAY_COLORS[idx % BAY_COLORS.length];
-              const utilisation = loc.capacity > 0 ? Math.round(((loc.current_stock || 0) / loc.capacity) * 100) : 0;
               return (
                 <div key={loc.id} className="bg-[#F4F1ED] rounded-xl p-4 flex items-start justify-between">
                   <div className="flex items-start gap-3">
@@ -300,10 +327,10 @@ export default function YardPage() {
                     <div>
                       <h4 className="font-semibold text-sm text-[#0A1711]">{loc.name}</h4>
                       <p className="text-xs text-[#4A5D53]">Section {loc.section} &middot; Capacity: {loc.capacity}</p>
-                      <p className="text-xs font-bold text-[#0A1711] mt-1">{loc.current_stock || 0} pallets ({utilisation}%)</p>
+                      <p className="text-xs font-bold text-[#0A1711] mt-1">{loc.current_stock || 0} pallets</p>
                     </div>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => handleDelete(loc.id)} className="text-red-400 hover:text-red-600">
+                  <Button variant="ghost" size="sm" onClick={() => handleDelete(loc.id)} className="text-red-400 hover:text-red-600" data-testid={`delete-bay-${loc.id}`}>
                     <Trash2 className="w-3.5 h-3.5" />
                   </Button>
                 </div>
@@ -314,11 +341,9 @@ export default function YardPage() {
       )}
 
       {/* Create Bay Dialog */}
-      <Dialog open={showCreateDialog} onOpenChange={(open) => { if (!open) { setShowCreateDialog(false); setPendingBounds(null); } }}>
+      <Dialog open={showCreateDialog} onOpenChange={(open) => { if (!open) { setShowCreateDialog(false); setPendingPolygon(null); } }}>
         <DialogContent data-testid="create-bay-dialog">
-          <DialogHeader>
-            <DialogTitle className="font-['Outfit']">Name This Bay</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle className="font-['Outfit']">Name This Bay</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-4">
             <div>
               <Label>Bay Name</Label>

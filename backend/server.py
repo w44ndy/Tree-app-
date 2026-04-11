@@ -263,6 +263,8 @@ class YardLocationCreate(BaseModel):
     capacity: int = 20
     description: Optional[str] = None
     bounds: Optional[list] = None
+    polygon: Optional[list] = None
+    rotation: Optional[float] = None
     colorIndex: Optional[int] = None
 
 @api_router.get("/yard-locations")
@@ -501,6 +503,32 @@ async def get_manifest(load_id: str, user=Depends(get_current_user)):
         if lorry_doc:
             lorry = serialize_doc(lorry_doc)
     return {"load": load_data, "pallets": enriched_pallets, "lorry": lorry}
+
+# ── Total Collected Stats ─────────────────────────────────────
+@api_router.get("/stock/total-collected")
+async def total_collected(user=Depends(get_current_user)):
+    """Total pallets that have left the site (dispatched/delivered collections)"""
+    pipeline = [
+        {"$match": {"type": "out"}},
+        {"$group": {"_id": "$color", "total": {"$sum": {"$abs": "$change"}}}}
+    ]
+    results = await db.stock_movements.aggregate(pipeline).to_list(50)
+    by_color = {r["_id"]: r["total"] for r in results}
+    total_pallets_out = sum(by_color.values())
+    # Also count total pallets ever added (in)
+    pipeline_in = [
+        {"$match": {"type": "in"}},
+        {"$group": {"_id": None, "total": {"$sum": "$change"}}}
+    ]
+    results_in = await db.stock_movements.aggregate(pipeline_in).to_list(1)
+    total_pallets_in = results_in[0]["total"] if results_in else 0
+    return {
+        "total_collected_pallets": total_pallets_out,
+        "total_collected_trees": total_pallets_out * 100,
+        "total_received_pallets": total_pallets_in,
+        "total_received_trees": total_pallets_in * 100,
+        "by_color": by_color
+    }
 
 # ── Root ─────────────────────────────────────────────────────
 @api_router.get("/")
