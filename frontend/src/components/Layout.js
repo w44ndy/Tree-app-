@@ -13,7 +13,6 @@ const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/field', label: 'Field', icon: TreePine },
   { path: '/pallets', label: 'Stock', icon: Package },
-  { path: '/yard', label: 'Yard Map', icon: MapPin },
   { path: '/loads', label: 'Collections', icon: Truck },
 ];
 

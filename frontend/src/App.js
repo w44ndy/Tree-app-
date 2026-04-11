@@ -43,7 +43,6 @@ function AppRoutes() {
       <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
       <Route path="/field" element={<ProtectedRoute><FieldPage /></ProtectedRoute>} />
       <Route path="/pallets" element={<ProtectedRoute><PalletsPage /></ProtectedRoute>} />
-      <Route path="/yard" element={<ProtectedRoute><YardPage /></ProtectedRoute>} />
       <Route path="/loads" element={<ProtectedRoute><LoadsPage /></ProtectedRoute>} />
     </Routes>
   );
