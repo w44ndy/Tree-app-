@@ -7,7 +7,6 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import PalletsPage from './pages/PalletsPage';
 import YardPage from './pages/YardPage';
-import OrdersPage from './pages/OrdersPage';
 import LoadsPage from './pages/LoadsPage';
 import './App.css';
 
@@ -41,7 +40,6 @@ function AppRoutes() {
       <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
       <Route path="/pallets" element={<ProtectedRoute><PalletsPage /></ProtectedRoute>} />
       <Route path="/yard" element={<ProtectedRoute><YardPage /></ProtectedRoute>} />
-      <Route path="/orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
       <Route path="/loads" element={<ProtectedRoute><LoadsPage /></ProtectedRoute>} />
     </Routes>
   );
