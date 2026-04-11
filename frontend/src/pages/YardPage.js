@@ -130,6 +130,8 @@ export default function YardPage() {
 
     if (newPoints.length >= 4) {
       setShowCreateDialog(true);
+      // Scroll to top so dialog is visible on iPad
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }, []);
 
