@@ -1,9 +1,9 @@
-import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
   LayoutDashboard, Package, MapPin, ClipboardList,
-  Truck, BoxesIcon, LogOut, User
+  Truck, BoxesIcon, LogOut, User, Menu, X
 } from 'lucide-react';
 
 const WC_LOGO = "https://customer-assets.emergentagent.com/job_tree-logistics/artifacts/7lohxwsd_2025Logo.png";
@@ -21,20 +21,43 @@ const navItems = [
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleLogout = async () => {
     await logout();
     navigate('/login');
   };
 
+  const closeSidebar = () => setSidebarOpen(false);
+
   return (
-    <div className="min-h-screen bg-[#F4F1ED] flex" data-testid="app-layout">
+    <div className="min-h-screen bg-[#F4F1ED]" data-testid="app-layout">
+      {/* Mobile top bar */}
+      <header className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-b border-[#1A4331]/15 px-4 py-3 flex items-center justify-between no-print">
+        <Button variant="ghost" size="sm" onClick={() => setSidebarOpen(true)} data-testid="menu-button">
+          <Menu className="w-5 h-5 text-[#0A1711]" />
+        </Button>
+        <img src={WC_LOGO} alt="Wilson Contractors" className="h-7 object-contain" />
+        <div className="w-9" />
+      </header>
+
+      {/* Overlay */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 bg-black/30 z-40 lg:hidden" onClick={closeSidebar} />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-64 bg-white/80 backdrop-blur-xl border-r border-[#1A4331]/15 flex flex-col no-print fixed h-full z-40" data-testid="sidebar">
-        <div className="p-5 border-b border-[#1A4331]/10">
-          <div className="flex items-center gap-3">
-            <img src={WC_LOGO} alt="Wilson Contractors" className="h-9 object-contain flex-shrink-0" />
-          </div>
+      <aside
+        className={`fixed top-0 left-0 h-full w-64 bg-white/95 backdrop-blur-xl border-r border-[#1A4331]/15 flex flex-col no-print z-50 transition-transform duration-300 ease-in-out
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}
+        data-testid="sidebar"
+      >
+        <div className="p-5 border-b border-[#1A4331]/10 flex items-center justify-between">
+          <img src={WC_LOGO} alt="Wilson Contractors" className="h-9 object-contain flex-shrink-0" />
+          <Button variant="ghost" size="sm" onClick={closeSidebar} className="lg:hidden">
+            <X className="w-4 h-4" />
+          </Button>
         </div>
 
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
@@ -43,6 +66,7 @@ export default function Layout({ children }) {
               key={item.path}
               to={item.path}
               end={item.path === '/'}
+              onClick={closeSidebar}
               className={({ isActive }) =>
                 `sidebar-link ${isActive ? 'active' : 'text-[#4A5D53] hover:text-[#0A1711]'}`
               }
@@ -78,8 +102,8 @@ export default function Layout({ children }) {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 ml-64 min-h-screen">
-        <div className="p-6 md:p-8 max-w-[1400px]">
+      <main className="lg:ml-64 min-h-screen pt-14 lg:pt-0">
+        <div className="p-4 md:p-6 lg:p-8 max-w-[1400px]">
           {children}
         </div>
       </main>
