@@ -8,6 +8,7 @@ import DashboardPage from './pages/DashboardPage';
 import PalletsPage from './pages/PalletsPage';
 import YardPage from './pages/YardPage';
 import LoadsPage from './pages/LoadsPage';
+import FieldPage from './pages/FieldPage';
 import ManifestPage from './pages/ManifestPage';
 import './App.css';
 
@@ -40,6 +41,7 @@ function AppRoutes() {
       <Route path="/login" element={user ? <Navigate to="/" /> : <LoginPage />} />
       <Route path="/manifest/:loadId" element={<ManifestPage />} />
       <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+      <Route path="/field" element={<ProtectedRoute><FieldPage /></ProtectedRoute>} />
       <Route path="/pallets" element={<ProtectedRoute><PalletsPage /></ProtectedRoute>} />
       <Route path="/yard" element={<ProtectedRoute><YardPage /></ProtectedRoute>} />
       <Route path="/loads" element={<ProtectedRoute><LoadsPage /></ProtectedRoute>} />

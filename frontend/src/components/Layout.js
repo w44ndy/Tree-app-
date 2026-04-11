@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
-  LayoutDashboard, Package, MapPin, ClipboardList,
-  Truck, BoxesIcon, LogOut, User, Menu, X
+  LayoutDashboard, Package, MapPin,
+  Truck, LogOut, User, Menu, X, TreePine
 } from 'lucide-react';
 
 const WC_LOGO = "https://customer-assets.emergentagent.com/job_tree-logistics/artifacts/7lohxwsd_2025Logo.png";
@@ -11,6 +11,7 @@ import { Button } from '../components/ui/button';
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/field', label: 'Field', icon: TreePine },
   { path: '/pallets', label: 'Stock', icon: Package },
   { path: '/yard', label: 'Yard Map', icon: MapPin },
   { path: '/loads', label: 'Collections', icon: Truck },
@@ -53,7 +54,7 @@ export default function Layout({ children }) {
       >
         <div className="p-5 border-b border-[#1A4331]/10 flex items-center justify-between">
           <div className="flex-1" />
-          <img src={WC_LOGO} alt="Wilson Contractors" className="h-9 object-contain" />
+          <img src={WC_LOGO} alt="Wilson Contractors" className="h-12 object-contain" />
           <div className="flex-1 flex justify-end">
             <Button variant="ghost" size="sm" onClick={closeSidebar} className="lg:hidden">
               <X className="w-4 h-4" />

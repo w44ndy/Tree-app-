@@ -296,6 +296,47 @@ async def delete_yard_location(loc_id: str, user=Depends(get_current_user)):
     await db.yard_locations.delete_one({"_id": ObjectId(loc_id)})
     return {"message": "Deleted"}
 
+# ── Field Collections ─────────────────────────────────────────
+class FieldCollectionItem(BaseModel):
+    color: str
+    quantity: int
+
+class FieldCollectionCreate(BaseModel):
+    items: List[FieldCollectionItem]
+    notes: Optional[str] = None
+
+@api_router.get("/field-collections")
+async def list_field_collections(user=Depends(get_current_user)):
+    collections = await db.field_collections.find().sort("created_at", -1).to_list(200)
+    return [serialize_doc(c) for c in collections]
+
+@api_router.post("/field-collections")
+async def create_field_collection(data: FieldCollectionCreate, user=Depends(get_current_user)):
+    doc = {
+        "items": [i.model_dump() for i in data.items if i.quantity > 0],
+        "notes": data.notes or "",
+        "collected_by": user.get("name", ""),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    # Add stock for each colour
+    total = 0
+    for item in doc["items"]:
+        color = item["color"].lower().strip()
+        qty = item["quantity"]
+        total += qty
+        await db.colours.update_one({"color": color}, {"$inc": {"quantity": qty}})
+        await db.stock_movements.insert_one({
+            "color": color, "change": qty, "type": "in",
+            "quantity_after": 0, "notes": f"Field collection",
+            "user_id": user["id"], "user_name": user.get("name", ""),
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
+    doc["total_pallets"] = total
+    result = await db.field_collections.insert_one(doc)
+    doc["id"] = str(result.inserted_id)
+    doc.pop("_id", None)
+    return doc
+
 # ── Haulers ──────────────────────────────────────────────────
 class HaulerCreate(BaseModel):
     name: str

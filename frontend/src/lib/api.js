@@ -24,6 +24,10 @@ export const getColourQR = (color) => api.get(`/colours/${color}/qr`);
 export const checkStock = () => api.get('/stock/check');
 export const getTotalCollected = () => api.get('/stock/total-collected');
 
+// Field Collections
+export const getFieldCollections = () => api.get('/field-collections');
+export const createFieldCollection = (data) => api.post('/field-collections', data);
+
 // Haulers
 export const getHaulers = () => api.get('/haulers');
 export const createHauler = (data) => api.post('/haulers', data);
