@@ -10,6 +10,7 @@ import YardPage from './pages/YardPage';
 import LoadsPage from './pages/LoadsPage';
 import FieldPage from './pages/FieldPage';
 import ManifestPage from './pages/ManifestPage';
+import TVDashboard from './pages/TVDashboard';
 import './App.css';
 
 const WC_LOGO = "https://customer-assets.emergentagent.com/job_tree-logistics/artifacts/7lohxwsd_2025Logo.png";
@@ -31,6 +32,13 @@ function ProtectedRoute({ children }) {
   return <Layout>{children}</Layout>;
 }
 
+function ProtectedFullscreen({ children }) {
+  const { user, loading } = useAuth();
+  if (loading) return <LoadingScreen />;
+  if (user === false) return <Navigate to="/login" />;
+  return children;
+}
+
 function AppRoutes() {
   const { user, loading } = useAuth();
 
@@ -40,6 +48,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" /> : <LoginPage />} />
       <Route path="/manifest/:loadId" element={<ManifestPage />} />
+      <Route path="/tv-dashboard" element={<ProtectedFullscreen><TVDashboard /></ProtectedFullscreen>} />
       <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
       <Route path="/field" element={<ProtectedRoute><FieldPage /></ProtectedRoute>} />
       <Route path="/pallets" element={<ProtectedRoute><PalletsPage /></ProtectedRoute>} />

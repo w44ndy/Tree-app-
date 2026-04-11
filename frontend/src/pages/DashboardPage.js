@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   Package, TreePine, Truck, Clock,
   RefreshCw, CheckCircle, AlertTriangle, XCircle,
-  Calendar, MapPin, ArrowRight, BarChart3, TrendingUp, Building2
+  Calendar, MapPin, ArrowRight, BarChart3, TrendingUp, Building2, Tv
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { useNavigate } from 'react-router-dom';
@@ -92,9 +92,14 @@ export default function DashboardPage() {
           <h1 className="text-3xl font-bold text-[#0A1711] font-['Outfit'] tracking-tight">Dashboard</h1>
           <p className="text-sm text-[#4A5D53] mt-1">Welcome back, {user?.name || 'Admin'} — Mains of Corsindae</p>
         </div>
-        <Button onClick={fetchAll} variant="outline" size="sm" className="border-[#1A4331]/20 text-[#1A4331]" data-testid="refresh-dashboard">
-          <RefreshCw className="w-4 h-4 mr-2" /> Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => navigate('/tv-dashboard')} variant="outline" size="sm" className="border-[#1A4331]/20 text-[#1A4331]" data-testid="tv-mode-button">
+            <Tv className="w-4 h-4 mr-2" /> TV Mode
+          </Button>
+          <Button onClick={fetchAll} variant="outline" size="sm" className="border-[#1A4331]/20 text-[#1A4331]" data-testid="refresh-dashboard">
+            <RefreshCw className="w-4 h-4 mr-2" /> Refresh
+          </Button>
+        </div>
       </div>
 
       {loading ? (
