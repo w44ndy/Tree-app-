@@ -411,6 +411,7 @@ export default function LoadsPage() {
                 <img src={WC_LOGO} alt="WC" className="h-10 object-contain" />
                 <div className="flex-1">
                   <p className="font-semibold text-[#0A1711]">{manifestLoad.driver_name}</p>
+                  {manifestLoad.signature?.registration && <p className="text-sm text-[#0A1711]">Reg: {manifestLoad.signature.registration}</p>}
                   <p className="text-xs text-[#4A5D53]">{fmtDate(manifestLoad.departure_date)} &middot; Ref: WC-{showViewManifest?.slice(-6).toUpperCase()}</p>
                 </div>
               </div>

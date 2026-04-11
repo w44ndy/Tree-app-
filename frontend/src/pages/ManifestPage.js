@@ -14,75 +14,27 @@ function SignaturePad({ onSave }) {
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasDrawn, setHasDrawn] = useState(false);
-
   const getPos = (e) => {
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    return {
-      x: (clientX - rect.left) * (canvas.width / rect.width),
-      y: (clientY - rect.top) * (canvas.height / rect.height)
-    };
+    const c = canvasRef.current, r = c.getBoundingClientRect();
+    const cx = e.touches ? e.touches[0].clientX : e.clientX;
+    const cy = e.touches ? e.touches[0].clientY : e.clientY;
+    return { x: (cx - r.left) * (c.width / r.width), y: (cy - r.top) * (c.height / r.height) };
   };
-
-  const startDraw = (e) => {
-    e.preventDefault();
-    const ctx = canvasRef.current.getContext('2d');
-    const pos = getPos(e);
-    ctx.beginPath();
-    ctx.moveTo(pos.x, pos.y);
-    setIsDrawing(true);
-    setHasDrawn(true);
-  };
-
-  const draw = (e) => {
-    if (!isDrawing) return;
-    e.preventDefault();
-    const ctx = canvasRef.current.getContext('2d');
-    const pos = getPos(e);
-    ctx.lineWidth = 2.5;
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = '#0A1711';
-    ctx.lineTo(pos.x, pos.y);
-    ctx.stroke();
-  };
-
-  const endDraw = () => setIsDrawing(false);
-
-  const clear = () => {
-    const ctx = canvasRef.current.getContext('2d');
-    ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-    setHasDrawn(false);
-  };
-
-  const save = () => {
-    if (!hasDrawn) return;
-    onSave(canvasRef.current.toDataURL('image/png'));
-  };
-
+  const start = (e) => { e.preventDefault(); const ctx = canvasRef.current.getContext('2d'); const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); setIsDrawing(true); setHasDrawn(true); };
+  const draw = (e) => { if (!isDrawing) return; e.preventDefault(); const ctx = canvasRef.current.getContext('2d'); const p = getPos(e); ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.strokeStyle = '#0A1711'; ctx.lineTo(p.x, p.y); ctx.stroke(); };
+  const end = () => setIsDrawing(false);
+  const clear = () => { canvasRef.current.getContext('2d').clearRect(0, 0, 500, 120); setHasDrawn(false); };
   return (
     <div>
-      <div className="border-2 border-dashed border-[#1A4331]/30 rounded-lg bg-white overflow-hidden">
-        <canvas
-          ref={canvasRef}
-          width={600}
-          height={200}
-          className="w-full touch-none"
-          style={{ height: '120px' }}
-          onMouseDown={startDraw}
-          onMouseMove={draw}
-          onMouseUp={endDraw}
-          onMouseLeave={endDraw}
-          onTouchStart={startDraw}
-          onTouchMove={draw}
-          onTouchEnd={endDraw}
-        />
+      <div className="border border-dashed border-gray-300 rounded bg-white overflow-hidden">
+        <canvas ref={canvasRef} width={500} height={120} className="w-full touch-none" style={{ height: '60px' }}
+          onMouseDown={start} onMouseMove={draw} onMouseUp={end} onMouseLeave={end}
+          onTouchStart={start} onTouchMove={draw} onTouchEnd={end} />
       </div>
-      <div className="flex items-center justify-between mt-2">
-        <button onClick={clear} className="text-xs text-[#4A5D53] underline">Clear</button>
-        <Button onClick={save} disabled={!hasDrawn} size="sm" className="bg-[#1A4331] text-white">
-          <Check className="w-3 h-3 mr-1" /> Confirm Signature
+      <div className="flex items-center justify-between mt-1">
+        <button onClick={clear} className="text-[10px] text-gray-400 underline">Clear</button>
+        <Button onClick={() => hasDrawn && onSave(canvasRef.current.toDataURL('image/png'))} disabled={!hasDrawn} size="sm" className="bg-[#1A4331] text-white text-xs h-7">
+          <Check className="w-3 h-3 mr-1" /> Sign & Dispatch
         </Button>
       </div>
     </div>
@@ -94,12 +46,13 @@ export default function ManifestPage() {
   const [manifest, setManifest] = useState(null);
   const [loading, setLoading] = useState(true);
   const [driverName, setDriverName] = useState('');
+  const [registration, setRegistration] = useState('');
   const [signed, setSigned] = useState(false);
   const [signatureImg, setSignatureImg] = useState(null);
   const [checkedItems, setCheckedItems] = useState({});
 
   useEffect(() => {
-    const fetchManifest = async () => {
+    (async () => {
       try {
         const { data } = await getManifestPublic(loadId);
         setManifest({ load: data.load });
@@ -107,264 +60,193 @@ export default function ManifestPage() {
           setSigned(true);
           setSignatureImg(data.load.signature.signature_data);
           setDriverName(data.load.signature.driver_name);
+          setRegistration(data.load.signature.registration || '');
         }
-      } catch (err) {
-        console.error('Failed to load manifest', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchManifest();
+      } catch { }
+      setLoading(false);
+    })();
   }, [loadId]);
 
-  const toggleChecked = (idx) => {
-    setCheckedItems(prev => ({ ...prev, [idx]: !prev[idx] }));
-  };
+  const toggleChecked = (i) => setCheckedItems(prev => ({ ...prev, [i]: !prev[i] }));
 
-  const handleSign = async (signatureData) => {
-    if (!driverName.trim()) return toast.error('Enter driver name before signing');
+  const handleSign = async (sigData) => {
+    if (!driverName.trim()) return toast.error('Enter driver name');
     try {
-      await signManifest(loadId, { driver_name: driverName, signature_data: signatureData });
-      // Auto-dispatch — deducts stock
-      try {
-        await updateLoad(loadId, { status: 'in_transit' });
-      } catch { /* may fail if not authed, that's ok */ }
+      await signManifest(loadId, { driver_name: driverName, signature_data: sigData, registration });
+      try { await updateLoad(loadId, { status: 'in_transit' }); } catch {}
       setSigned(true);
-      setSignatureImg(signatureData);
-      toast.success('Manifest signed & dispatched');
-    } catch (err) {
-      toast.error('Failed to save signature');
-    }
+      setSignatureImg(sigData);
+      toast.success('Signed & dispatched');
+    } catch { toast.error('Failed'); }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="w-8 h-8 border-2 border-[#1A4331] border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (!manifest) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <p className="text-gray-500">Manifest not found</p>
-      </div>
-    );
-  }
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-white"><div className="w-6 h-6 border-2 border-[#1A4331] border-t-transparent rounded-full animate-spin" /></div>;
+  if (!manifest) return <div className="min-h-screen flex items-center justify-center bg-white"><p className="text-gray-500">Manifest not found</p></div>;
 
   const load = manifest.load;
   const pallets = load.pallets_required || [];
-  const totalPallets = pallets.reduce((sum, p) => sum + (p.quantity || 0), 0);
-  const totalTrees = totalPallets * 100;
+  const totalPallets = pallets.reduce((s, p) => s + (p.quantity || 0), 0);
   const allChecked = pallets.length > 0 && pallets.every((_, i) => checkedItems[i]);
 
   return (
     <div className="min-h-screen bg-white" data-testid="manifest-page">
       {/* Top bar */}
-      <div className="no-print sticky top-0 bg-white/95 backdrop-blur-sm border-b border-gray-200 px-4 py-2.5 flex items-center justify-between z-10">
-        <Button variant="ghost" size="sm" onClick={() => window.history.back()} data-testid="manifest-back">
-          <ArrowLeft className="w-4 h-4 mr-1" /> Back
-        </Button>
-        <Button onClick={() => window.print()} size="sm" className="bg-[#1A4331] text-white" data-testid="print-manifest-button">
-          <Printer className="w-4 h-4 mr-1" /> Print
-        </Button>
+      <div className="no-print sticky top-0 bg-white/95 backdrop-blur-sm border-b border-gray-200 px-4 py-2 flex items-center justify-between z-10">
+        <Button variant="ghost" size="sm" onClick={() => window.history.back()}><ArrowLeft className="w-4 h-4 mr-1" /> Back</Button>
+        <Button onClick={() => window.print()} size="sm" className="bg-[#1A4331] text-white"><Printer className="w-4 h-4 mr-1" /> Print</Button>
       </div>
 
-      {/* Content */}
-      <div className="max-w-2xl mx-auto px-4 sm:px-8 py-6 sm:py-10" id="manifest-content">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between border-b-2 border-[#1A4331] pb-5 mb-6 gap-4">
+      {/* Single page manifest */}
+      <div className="max-w-[210mm] mx-auto px-6 py-4 print:p-6 print:max-w-none" style={{ maxHeight: '297mm' }}>
+        {/* Row 1: Header */}
+        <div className="flex items-start justify-between border-b-2 border-[#1A4331] pb-3 mb-3">
           <div>
-            <img src={WC_LOGO} alt="Wilson Contractors" className="h-12 sm:h-16 object-contain" />
-            <p className="text-[11px] text-[#4A5D53] mt-2">Mains of Corsindae, Sauchen</p>
-            <p className="text-[11px] text-[#4A5D53]">Inverurie, Aberdeenshire AB51 7QL</p>
+            <img src={WC_LOGO} alt="Wilson Contractors" className="h-10 object-contain" />
+            <p className="text-[9px] text-[#4A5D53] mt-1">Mains of Corsindae, Sauchen, AB51 7QL</p>
           </div>
-          <div className="sm:text-right">
-            <h2 className="text-base sm:text-lg font-bold text-[#1A4331] uppercase tracking-wider" style={{ fontFamily: 'Outfit, sans-serif' }}>Collection Manifest</h2>
-            <p className="text-xs text-[#4A5D53] mt-0.5">Ref: WC-{loadId?.slice(-6).toUpperCase()}</p>
+          <div className="text-right">
+            <h2 className="text-sm font-bold text-[#1A4331] uppercase tracking-wider" style={{ fontFamily: 'Outfit, sans-serif' }}>Collection Manifest</h2>
+            <p className="text-[9px] text-[#4A5D53]">Ref: WC-{loadId?.slice(-6).toUpperCase()}</p>
           </div>
         </div>
 
-        {/* Details Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3 mb-6">
+        {/* Row 2: Details grid - compact */}
+        <div className="grid grid-cols-4 gap-3 mb-3 text-xs">
           <div>
-            <span className="text-[10px] uppercase tracking-wider text-[#4A5D53] font-bold">Company / Haulier</span>
-            <p className="text-sm sm:text-base font-semibold text-[#0A1711] mt-0.5 border-b border-dotted border-gray-300 pb-1">{load.driver_name || '—'}</p>
+            <span className="text-[8px] uppercase tracking-wider text-[#4A5D53] font-bold block">Hauler</span>
+            <p className="font-semibold text-[#0A1711] leading-tight">{load.driver_name || '—'}</p>
+            {(load.signature?.registration || registration) && <p className="text-[#4A5D53]">Reg: {load.signature?.registration || registration}</p>}
           </div>
           <div>
-            <span className="text-[10px] uppercase tracking-wider text-[#4A5D53] font-bold">Collection Date</span>
-            <p className="text-sm sm:text-base font-semibold text-[#0A1711] mt-0.5 border-b border-dotted border-gray-300 pb-1">
-              {load.departure_date ? new Date(load.departure_date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' }) : '—'}
+            <span className="text-[8px] uppercase tracking-wider text-[#4A5D53] font-bold block">Date</span>
+            <p className="font-semibold text-[#0A1711] leading-tight">
+              {load.departure_date ? new Date(load.departure_date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
             </p>
           </div>
           <div>
-            <span className="text-[10px] uppercase tracking-wider text-[#4A5D53] font-bold">Status</span>
-            <p className="text-sm sm:text-base font-semibold text-[#0A1711] mt-0.5 border-b border-dotted border-gray-300 pb-1 capitalize">{load.status?.replace('_', ' ')}</p>
+            <span className="text-[8px] uppercase tracking-wider text-[#4A5D53] font-bold block">Destination</span>
+            <p className="font-semibold text-[#0A1711] leading-tight">{load.destinations?.map(d => d.address).join('; ') || '—'}</p>
           </div>
           <div>
-            <span className="text-[10px] uppercase tracking-wider text-[#4A5D53] font-bold">Ref</span>
-            <p className="text-sm sm:text-base font-semibold text-[#0A1711] mt-0.5 border-b border-dotted border-gray-300 pb-1">WC-{loadId?.slice(-6).toUpperCase()}</p>
+            <span className="text-[8px] uppercase tracking-wider text-[#4A5D53] font-bold block">Status</span>
+            <p className="font-semibold text-[#0A1711] capitalize leading-tight">{load.status?.replace('_', ' ')}</p>
           </div>
         </div>
 
-        {/* Destinations */}
-        {load.destinations?.length > 0 && (
-          <div className="mb-6">
-            <h3 className="text-xs font-bold text-[#1A4331] uppercase tracking-wider mb-2 border-b border-[#1A4331]/20 pb-1.5" style={{ fontFamily: 'Outfit, sans-serif' }}>Delivery Destination(s)</h3>
-            {load.destinations.map((d, i) => (
-              <div key={i} className="flex items-center gap-2.5 py-1.5">
-                <span className="text-[10px] bg-[#1A4331] text-white rounded-full w-5 h-5 flex items-center justify-center font-bold flex-shrink-0">{i + 1}</span>
-                <p className="text-sm text-[#0A1711]">{d.address}</p>
-              </div>
+        {/* Row 3: Pallets table - compact */}
+        <table className="w-full mb-3 text-xs">
+          <thead>
+            <tr className="border-b-2 border-[#1A4331]">
+              <th className="text-left text-[8px] uppercase tracking-wider text-[#4A5D53] font-bold py-1">Colour</th>
+              <th className="text-right text-[8px] uppercase tracking-wider text-[#4A5D53] font-bold py-1">Pallets</th>
+              <th className="text-right text-[8px] uppercase tracking-wider text-[#4A5D53] font-bold py-1">Trees</th>
+              <th className="text-center text-[8px] uppercase tracking-wider text-[#4A5D53] font-bold py-1 w-16">Checked</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pallets.map((p, i) => (
+              <tr key={i} onClick={() => !signed && toggleChecked(i)} className={`border-b border-gray-100 cursor-pointer select-none ${checkedItems[i] ? 'bg-emerald-50' : ''}`}>
+                <td className="py-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLOR_HEX[p.color] || '#1A4331' }} />
+                    <span className={`font-medium capitalize ${checkedItems[i] ? 'line-through text-gray-400' : ''}`}>{p.color}</span>
+                  </div>
+                </td>
+                <td className="text-right font-bold py-1.5">{p.quantity}</td>
+                <td className="text-right text-[#4A5D53] py-1.5">{(p.quantity || 0) * 100}</td>
+                <td className="text-center py-1.5">
+                  <div className={`w-5 h-5 rounded border-2 inline-flex items-center justify-center mx-auto transition-all ${checkedItems[i] ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-gray-300 text-transparent print:border-gray-400'}`}>
+                    <Check className="w-3 h-3" />
+                  </div>
+                </td>
+              </tr>
             ))}
+          </tbody>
+          <tfoot>
+            <tr className="border-t-2 border-[#1A4331]">
+              <td className="py-1.5 font-bold">TOTAL</td>
+              <td className="text-right font-bold py-1.5">{totalPallets}</td>
+              <td className="text-right font-bold py-1.5">{totalPallets * 100}</td>
+              <td className="text-center py-1.5">{allChecked && <Check className="w-4 h-4 text-emerald-600 mx-auto" />}</td>
+            </tr>
+          </tfoot>
+        </table>
+
+        {/* Row 4: Notes (if any) */}
+        {load.notes && (
+          <div className="mb-3 bg-[#F4F1ED] rounded px-3 py-1.5 text-xs">
+            <span className="text-[8px] uppercase tracking-wider text-[#4A5D53] font-bold">Notes: </span>
+            <span className="text-[#0A1711]">{load.notes}</span>
           </div>
         )}
 
-        {/* Pallets Table — tickable */}
-        <div className="mb-6">
-          <h3 className="text-xs font-bold text-[#1A4331] uppercase tracking-wider mb-2 border-b border-[#1A4331]/20 pb-1.5" style={{ fontFamily: 'Outfit, sans-serif' }}>Pallets Loaded</h3>
+        {/* Row 5: Signature section */}
+        <div className="border-t-2 border-[#1A4331] pt-3">
+          <p className="text-[9px] text-[#4A5D53] mb-2">I confirm the above pallets have been loaded and I accept responsibility for safe delivery to the stated destination(s).</p>
 
-          {pallets.length === 0 ? (
-            <p className="text-sm text-[#4A5D53] py-4">No pallets specified.</p>
+          {signed ? (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+              <div className="grid grid-cols-3 gap-3 text-xs">
+                <div>
+                  <span className="text-[8px] uppercase tracking-wider text-[#4A5D53] font-bold block">Driver</span>
+                  <p className="font-semibold">{driverName}</p>
+                </div>
+                <div>
+                  <span className="text-[8px] uppercase tracking-wider text-[#4A5D53] font-bold block">Registration</span>
+                  <p className="font-semibold">{registration || '—'}</p>
+                </div>
+                <div>
+                  <span className="text-[8px] uppercase tracking-wider text-[#4A5D53] font-bold block">Date/Time</span>
+                  <p className="font-semibold">{load.signature?.signed_at ? new Date(load.signature.signed_at).toLocaleString('en-GB') : new Date().toLocaleString('en-GB')}</p>
+                </div>
+              </div>
+              {signatureImg && (
+                <div className="mt-2">
+                  <span className="text-[8px] uppercase tracking-wider text-[#4A5D53] font-bold">Signature</span>
+                  <img src={signatureImg} alt="Signature" className="max-h-12 mt-0.5" />
+                </div>
+              )}
+              <Button onClick={() => window.print()} size="sm" className="mt-2 bg-[#1A4331] text-white no-print w-full text-xs">
+                <Printer className="w-3 h-3 mr-1" /> Print Copy for Driver
+              </Button>
+            </div>
           ) : (
             <>
-              {/* Mobile-friendly card layout */}
-              <div className="space-y-2">
-                {pallets.map((p, i) => (
-                  <div
-                    key={i}
-                    onClick={() => toggleChecked(i)}
-                    className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all duration-200 select-none active:scale-[0.98] ${checkedItems[i] ? 'border-emerald-400 bg-emerald-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}
-                    data-testid={`check-pallet-${i}`}
-                  >
-                    <div className={`w-8 h-8 rounded-lg border-2 flex items-center justify-center flex-shrink-0 transition-all ${checkedItems[i] ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-gray-300 text-transparent'}`}>
-                      <Check className="w-5 h-5" />
-                    </div>
-                    <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: COLOR_HEX[p.color] || '#1A4331' }} />
-                    <span className={`text-sm font-semibold capitalize flex-1 ${checkedItems[i] ? 'line-through text-[#4A5D53]' : 'text-[#0A1711]'}`}>{p.color}</span>
-                    <div className="text-right">
-                      <span className="text-lg font-bold text-[#0A1711]">{p.quantity}</span>
-                      <span className="text-xs text-[#4A5D53] ml-1">pallets</span>
-                    </div>
+              {/* Screen: interactive signing */}
+              <div className="no-print space-y-2">
+                {!allChecked && pallets.length > 0 && <p className="text-[10px] text-amber-600">Tap each pallet row above to check off</p>}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-[9px] text-[#4A5D53] font-bold uppercase tracking-wider">Driver Name</Label>
+                    <Input value={driverName} onChange={e => setDriverName(e.target.value)} placeholder="Full name" className="h-8 text-sm mt-0.5" />
                   </div>
-                ))}
-              </div>
-
-              {/* Total */}
-              <div className="flex items-center justify-between mt-3 pt-3 border-t-2 border-[#1A4331]">
-                <span className="text-sm font-bold text-[#0A1711]">TOTAL</span>
+                  <div>
+                    <Label className="text-[9px] text-[#4A5D53] font-bold uppercase tracking-wider">Registration</Label>
+                    <Input value={registration} onChange={e => setRegistration(e.target.value)} placeholder="e.g. AB12 CDE" className="h-8 text-sm mt-0.5" />
+                  </div>
+                </div>
                 <div>
-                  <span className="text-lg font-bold text-[#0A1711]">{totalPallets}</span>
-                  <span className="text-xs text-[#4A5D53] ml-1">pallets</span>
-                  <span className="text-xs text-[#4A5D53] ml-2">({totalTrees} trees)</span>
+                  <Label className="text-[9px] text-[#4A5D53] font-bold uppercase tracking-wider flex items-center gap-1"><PenTool className="w-3 h-3" /> Signature</Label>
+                  <div className="mt-0.5"><SignaturePad onSave={handleSign} /></div>
                 </div>
               </div>
-
-              {!allChecked && !signed && (
-                <p className="text-xs text-amber-600 mt-2 no-print">Tap each row to tick off as you check with the driver</p>
-              )}
-              {allChecked && !signed && (
-                <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-2.5 mt-3 no-print">
-                  <p className="text-sm text-emerald-800 font-medium">All pallets verified — driver can sign below</p>
+              {/* Print: blank signature lines */}
+              <div className="print-only">
+                <div className="grid grid-cols-3 gap-6 mt-2">
+                  <div><p className="text-[9px] text-[#4A5D53] mb-4">Driver Name:</p><div className="border-b border-gray-400" /></div>
+                  <div><p className="text-[9px] text-[#4A5D53] mb-4">Registration:</p><div className="border-b border-gray-400" /></div>
+                  <div><p className="text-[9px] text-[#4A5D53] mb-4">Date:</p><div className="border-b border-gray-400" /></div>
                 </div>
-              )}
+                <div className="mt-3"><p className="text-[9px] text-[#4A5D53] mb-6">Signature:</p><div className="border-b border-gray-400" /></div>
+              </div>
             </>
           )}
         </div>
 
-        {/* Notes */}
-        {load.notes && (
-          <div className="mb-6 bg-[#F4F1ED] rounded-lg p-3">
-            <span className="text-[10px] uppercase tracking-wider text-[#4A5D53] font-bold">Notes</span>
-            <p className="text-sm text-[#0A1711] mt-1">{load.notes}</p>
-          </div>
-        )}
-
-        {/* Signature */}
-        <div className="border-t-2 border-[#1A4331] pt-5 mt-6">
-          <h3 className="text-xs font-bold text-[#1A4331] uppercase tracking-wider mb-3" style={{ fontFamily: 'Outfit, sans-serif' }}>Driver Acknowledgement</h3>
-          <p className="text-[11px] text-[#4A5D53] mb-4">I confirm the above pallets have been loaded and I accept responsibility for safe delivery.</p>
-
-          {signed ? (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Check className="w-5 h-5 text-emerald-600" />
-                <span className="font-semibold text-emerald-800 text-sm">Signed</span>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <span className="text-[10px] uppercase tracking-wider text-[#4A5D53] font-bold">Driver</span>
-                  <p className="text-sm font-semibold text-[#0A1711] mt-0.5">{driverName}</p>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase tracking-wider text-[#4A5D53] font-bold">Date</span>
-                  <p className="text-sm font-semibold text-[#0A1711] mt-0.5">
-                    {load.signature?.signed_at ? new Date(load.signature.signed_at).toLocaleString('en-GB') : new Date().toLocaleString('en-GB')}
-                  </p>
-                </div>
-              </div>
-              {signatureImg && (
-                <div className="mt-3">
-                  <span className="text-[10px] uppercase tracking-wider text-[#4A5D53] font-bold">Signature</span>
-                  <img src={signatureImg} alt="Signature" className="max-h-16 mt-1" />
-                </div>
-              )}
-              <Button onClick={() => window.print()} className="mt-4 bg-[#1A4331] text-white w-full no-print" data-testid="print-after-sign">
-                <Printer className="w-4 h-4 mr-2" /> Print Copy for Driver
-              </Button>
-            </div>
-          ) : (
-            <div className="no-print space-y-4">
-              <div>
-                <Label className="text-[10px] uppercase tracking-wider text-[#4A5D53] font-bold">Driver Name</Label>
-                <Input
-                  value={driverName}
-                  onChange={e => setDriverName(e.target.value)}
-                  placeholder="Full name"
-                  className="mt-1"
-                  data-testid="driver-name-sign"
-                />
-              </div>
-              <div>
-                <Label className="text-[10px] uppercase tracking-wider text-[#4A5D53] font-bold flex items-center gap-1">
-                  <PenTool className="w-3 h-3" /> Signature
-                </Label>
-                <div className="mt-1">
-                  <SignaturePad onSave={handleSign} />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Print-only signature lines */}
-          {!signed && (
-            <div className="print-only mt-6">
-              <div className="grid grid-cols-2 gap-8">
-                <div>
-                  <p className="text-xs text-[#4A5D53] mb-6">Driver Name:</p>
-                  <div className="border-b border-gray-400" />
-                </div>
-                <div>
-                  <p className="text-xs text-[#4A5D53] mb-6">Date:</p>
-                  <div className="border-b border-gray-400" />
-                </div>
-              </div>
-              <div className="mt-4">
-                <p className="text-xs text-[#4A5D53] mb-10">Signature:</p>
-                <div className="border-b border-gray-400" />
-              </div>
-            </div>
-          )}
-        </div>
-
         {/* Footer */}
-        <div className="mt-8 pt-3 border-t border-gray-200 flex items-center justify-between">
-          <img src={WC_LOGO} alt="Wilson Contractors" className="h-6 sm:h-8 object-contain opacity-50" />
-          <div className="text-right">
-            <p className="text-[9px] sm:text-[10px] text-[#4A5D53]">Mains of Corsindae, Sauchen, AB51 7QL</p>
-            <p className="text-[9px] sm:text-[10px] text-[#4A5D53]">TMS.wilson-contractors.co.uk</p>
-          </div>
+        <div className="mt-3 pt-2 border-t border-gray-200 flex items-center justify-between">
+          <img src={WC_LOGO} alt="WC" className="h-5 object-contain opacity-40" />
+          <p className="text-[8px] text-[#4A5D53]">TMS.wilson-contractors.co.uk</p>
         </div>
       </div>
     </div>
