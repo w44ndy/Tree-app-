@@ -48,6 +48,10 @@ export default function LoginPage() {
       {/* Right - Login Form */}
       <div className="flex-1 flex items-center justify-center p-8 bg-[#F4F1ED]">
         <div className="w-full max-w-md">
+          {/* Logo for mobile/tablet - hidden on desktop where left panel shows */}
+          <div className="lg:hidden flex justify-center mb-8">
+            <img src={WC_LOGO} alt="Wilson Contractors" className="h-14 object-contain" />
+          </div>
           <div className="flex items-center gap-3 mb-8">
             <div className="w-12 h-12 rounded-xl bg-[#1A4331] flex items-center justify-center">
               <TreePine className="w-7 h-7 text-white" />
