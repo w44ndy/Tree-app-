@@ -112,30 +112,32 @@ export default function YardPage() {
 
   useEffect(() => { fetchData(); }, []);
 
+  const drawPointsRef = useRef([]);
+
   const handlePinDropped = useCallback((latlng) => {
-    setDrawPoints(prev => {
-      const newPoints = [...prev, latlng];
-      if (newPoints.length >= 4) {
-        // Auto-complete: show dialog
-        setTimeout(() => {
-          setIsDrawing(false);
-          setShowCreateDialog(true);
-        }, 100);
-      }
-      return newPoints;
-    });
+    const newPoints = [...drawPointsRef.current, latlng];
+    drawPointsRef.current = newPoints;
+    setDrawPoints([...newPoints]);
+    if (newPoints.length >= 4) {
+      // Don't disable drawing yet - keep map locked until dialog is handled
+      setShowCreateDialog(true);
+    }
   }, []);
 
-  const handleDropPin = () => {
+  const handleDropPin = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
     if (window._dropBayPin) window._dropBayPin();
   };
 
   const handleCreateBay = async () => {
     if (!form.name.trim()) return toast.error('Enter a bay name');
     try {
-      await createYardLocation({ ...form, polygon: drawPoints, colorIndex: locations.length });
+      await createYardLocation({ ...form, polygon: drawPointsRef.current, colorIndex: locations.length });
       toast.success(`Bay "${form.name}" created`);
       setShowCreateDialog(false);
+      setIsDrawing(false);
+      drawPointsRef.current = [];
       setDrawPoints([]);
       setForm({ name: '', section: 'A', capacity: 20, description: '' });
       fetchData();
@@ -148,6 +150,7 @@ export default function YardPage() {
 
   const cancelDrawing = () => {
     setIsDrawing(false);
+    drawPointsRef.current = [];
     setDrawPoints([]);
   };
 
@@ -245,9 +248,9 @@ export default function YardPage() {
       </div>
 
       {/* Place Corner button - only when drawing */}
-      {isDrawing && (
-        <div className="flex items-center justify-center gap-4">
-          <Button onClick={handleDropPin} size="lg" className="bg-[#1A4331] text-white hover:bg-[#1A4331]/90 rounded-xl px-8 h-14 text-base" data-testid="place-corner-button">
+      {isDrawing && drawPoints.length < 4 && (
+        <div className="flex items-center justify-center gap-4" onTouchEnd={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+          <Button onClick={handleDropPin} onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); handleDropPin(e); }} size="lg" className="bg-[#1A4331] text-white hover:bg-[#1A4331]/90 rounded-xl px-8 h-14 text-base" data-testid="place-corner-button">
             <Crosshair className="w-5 h-5 mr-2" /> Place Corner {drawPoints.length + 1}
           </Button>
           {drawPoints.length > 0 && (
@@ -261,8 +264,6 @@ export default function YardPage() {
           )}
         </div>
       )}
-
-      {/* Stock by Colour */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4" data-testid="stock-overview">
         {colours.map((c) => (
           <div key={c.id} className="bg-white border border-[#1A4331]/15 rounded-xl p-4">
