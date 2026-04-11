@@ -262,6 +262,8 @@ class YardLocationCreate(BaseModel):
     section: str = "A"
     capacity: int = 20
     description: Optional[str] = None
+    bounds: Optional[list] = None
+    colorIndex: Optional[int] = None
 
 @api_router.get("/yard-locations")
 async def list_yard_locations(user=Depends(get_current_user)):
