@@ -1,42 +1,57 @@
 # Wilson Contractors - Tree Management System (TMS)
+
 ## Original Problem Statement
-App for Wilson Contractors managing Christmas trees — pallets collected at field, stored at Mains of Corsindae, assign pallets to loads, collection with lorries. Stock/location visibility in yard, order input with stock checking, lorry loading with pallet positions, multiple destinations per load. Desktop + iPad. Print manifests, QR coding pallets. Trees grouped by colour. Dashboard for owner in London with live camera feed.
+App for Wilson Contractors managing Christmas trees — from pallets collected at the field, stored at Mains of Corsindae, assigned to loads, then collected with lorries. Track stock and locations in the yard, input orders, check stock fulfillment, load lorries, select pallet locations. Multiple destinations per load. Desktop and iPad responsive. Print manifests. Trees grouped by colour. Clear dashboard for owner in London with live camera feed option.
 
-## Architecture
-- **Backend**: FastAPI + MongoDB (Motor async driver)
-- **Frontend**: React + Tailwind CSS + Shadcn UI
-- **Auth**: JWT httpOnly cookies, bcrypt, role-based (admin, yard_manager, driver)
-- **Domain**: TMS.wilson-contractors.co.uk
+## Business Rules
+- 1 Pallet = 100 Trees
+- Tracked by Colour (not individual pallet IDs)
+- TMS branding (TMS.wilson-contractors.co.uk) with Wilson Contractors Logo
 
-## User Personas
-- **Owner (London)**: Dashboard view, KPIs, live camera, order oversight
-- **Yard Manager**: Pallet CRUD, yard locations, stock management, order fulfillment
-- **Driver**: Load viewing, manifest access, delivery status updates
+## Tech Stack
+- Frontend: React + Tailwind + Shadcn UI
+- Backend: FastAPI + MongoDB (Motor)
+- Additional: react-leaflet, react-signature-canvas, recharts
 
-## What's Been Implemented (2026-04-11)
-- Auth (login/logout, admin seeding, JWT cookies)
-- Dashboard with KPIs, stock charts (bar/pie), live camera feed widget
-- Pallet management (CRUD, color-coded, QR code generation)
-- Yard & Stock (locations, stock overview by colour, capacity tracking)
-- Order management (multi-item orders, stock fulfillment checking)
-- Load management (multi-destination, lorry assignment)
-- Lorry loading map (2D grid for pallet positioning)
-- Manifest viewing/printing
-- Lorry fleet management
-- Wilson Contractors branding (logo from website, TMS subdomain)
+## Pages
+| Page | Route | Status |
+|------|-------|--------|
+| Login | /login | Done |
+| Dashboard | / | Done |
+| TV Dashboard | /tv-dashboard | Done |
+| Field (Inbound) | /field | Done |
+| Stock (Colours) | /pallets | Done |
+| Collections (Outbound) | /loads | Done |
+| Manifest (Printable) | /manifest/:loadId | Done |
+| Yard Map | (in sidebar? TBD) | Done (YardPage.js exists) |
 
-## Prioritized Backlog
-### P0 (Next)
-- iPad-optimized responsive sidebar (collapsible hamburger menu)
-- Live camera stream URL configuration (replace mock image)
+## Key DB Collections
+- `users`: {email, name, password_hash, role}
+- `colours`: {name, hex, quantity, tree_count}
+- `locations`: {name, capacity, colorIndex, points, stock}
+- `loads`: {hauler, collection_date, destinations, pallets_required, status, driver_name, registration, signature, dispatched_at}
+- `haulers`: {name}
+- `field_collections`: {date, user_id, user_name, pallets, total_pallets, notes}
 
-### P1
-- User management (create yard_manager/driver accounts)
-- QR code scanning via iPad camera
-- Pallet batch import from CSV
+## Completed Features
+- JWT Authentication & Admin seeding
+- Wilson Contractors branding throughout
+- Dashboard with analytics (7-day requirements, stock charts, hauler stats)
+- TV Dashboard — fullscreen dark-themed page for office TV (auto-refresh 30s, no sidebar)
+- Field Page — tap interface for inbound pallets
+- Stock Page — manage colours and quantities
+- Collections Page — scheduling, inline driver signatures, haulers CRUD, edit/delete
+- Manifest Page — printable with driver info, signature, check-off boxes
+- Yard Map — iPad-compatible static satellite map drawing tool (Corsindae)
 
-### P2
-- Delivery tracking with GPS
-- Customer portal for order status
-- Historical reporting & analytics
-- Email notifications for order/delivery status
+## Pending / Blocked
+- Reolink Camera feed — BLOCKED waiting for user to provide IP/RTSP details
+
+## Backlog
+- QR coding for pallets (if needed)
+- Further Yard Map enhancements
+- Additional reporting / export features
+
+## Auth Credentials
+- Admin: admin@wilsoncontractors.co.uk / Wilson2026!
+- Test: test / test
