@@ -38,20 +38,17 @@ export default function DashboardPage() {
   useEffect(() => { fetchStats(); }, []);
 
   const statCards = stats ? [
-    { label: 'Total Trees', value: stats.total_trees, icon: TreePine, color: '#1A4331' },
-    { label: 'Pallets in Yard', value: stats.in_yard, icon: Package, color: '#286646' },
-    { label: 'Pallets in Field', value: stats.in_field, icon: MapPin, color: '#4B6B50' },
+    { label: 'Total Pallets', value: stats.total_pallets, icon: Package, color: '#1A4331' },
+    { label: 'Total Trees', value: (stats.total_pallets * 100).toLocaleString(), icon: TreePine, color: '#286646' },
     { label: 'Active Loads', value: stats.active_loads, icon: Truck, color: '#E27B58' },
     { label: 'Pending Orders', value: stats.pending_orders, icon: ClipboardList, color: '#EAB308' },
     { label: 'Lorries Available', value: `${stats.available_lorries}/${stats.total_lorries}`, icon: Truck, color: '#3B82F6' },
-    { label: 'Loaded', value: stats.loaded, icon: BarChart3, color: '#6366f1' },
-    { label: 'Delivered', value: stats.delivered, icon: TrendingUp, color: '#64748b' },
   ] : [];
 
   const chartData = stats?.stock_by_color?.map(s => ({
     name: s.color?.charAt(0).toUpperCase() + s.color?.slice(1),
-    trees: s.quantity,
-    pallets: s.pallets,
+    pallets: s.quantity,
+    trees: s.quantity * 100,
     fill: COLOR_MAP[s.color] || '#1A4331'
   })) || [];
 
@@ -85,7 +82,7 @@ export default function DashboardPage() {
       ) : (
         <>
           {/* KPI Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4" data-testid="stats-grid">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4" data-testid="stats-grid">
             {statCards.map((card, i) => (
               <div key={i} className="stat-card" data-testid={`stat-${card.label.toLowerCase().replace(/\s+/g, '-')}`}>
                 <div className="flex items-center justify-between mb-3">
@@ -176,8 +173,8 @@ export default function DashboardPage() {
                         <span className="text-sm font-medium capitalize">{s.color}</span>
                       </div>
                       <div className="text-right">
-                        <span className="text-sm font-bold text-[#0A1711]">{s.quantity} trees</span>
-                        <span className="text-xs text-[#4A5D53] ml-2">({s.pallets} pallets)</span>
+                        <span className="text-sm font-bold text-[#0A1711]">{s.quantity} pallets</span>
+                        <span className="text-xs text-[#4A5D53] ml-2">({(s.quantity * 100).toLocaleString()} trees)</span>
                       </div>
                     </div>
                   ))}

@@ -94,12 +94,13 @@ export default function StockPage() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-bold text-[#0A1711] font-['Outfit'] tracking-tight">Stock</h1>
-          <p className="text-sm text-[#4A5D53] mt-1">Track pallets by colour — scan QR to adjust</p>
+          <p className="text-sm text-[#4A5D53] mt-1">Track pallets by colour — 100 trees per pallet</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="bg-white border border-[#1A4331]/15 rounded-xl px-4 py-2">
             <span className="text-xs uppercase tracking-wider text-[#4A5D53] font-bold">Total Stock</span>
-            <p className="text-2xl font-bold text-[#0A1711] font-['Outfit']">{totalStock}</p>
+            <p className="text-2xl font-bold text-[#0A1711] font-['Outfit']">{totalStock} <span className="text-sm font-normal text-[#4A5D53]">pallets</span></p>
+            <p className="text-xs text-[#4A5D53]">{(totalStock * 100).toLocaleString()} trees</p>
           </div>
           <Dialog open={showAddColour} onOpenChange={setShowAddColour}>
             <DialogTrigger asChild>
@@ -151,7 +152,8 @@ export default function StockPage() {
               </div>
             </div>
 
-            <p className="text-4xl font-bold text-[#0A1711] font-['Outfit'] mb-4">{c.quantity || 0}</p>
+            <p className="text-4xl font-bold text-[#0A1711] font-['Outfit'] mb-1">{c.quantity || 0}</p>
+            <p className="text-xs text-[#4A5D53] mb-4">{(c.quantity || 0) * 100} trees</p>
 
             <div className="flex items-center gap-2">
               <Button

@@ -115,7 +115,7 @@ export default function YardPage() {
                   <span className="text-sm font-semibold capitalize text-[#0A1711]">{color}</span>
                 </div>
                 <p className="text-2xl font-bold text-[#0A1711] font-['Outfit']">{data.quantity}</p>
-                <p className="text-xs text-[#4A5D53]">{data.count} pallets</p>
+                <p className="text-xs text-[#4A5D53]">{data.count} pallets &middot; {(data.quantity * 100).toLocaleString()} trees</p>
               </div>
             ))}
           </div>
