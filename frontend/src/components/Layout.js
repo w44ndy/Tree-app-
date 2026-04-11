@@ -52,10 +52,13 @@ export default function Layout({ children }) {
         data-testid="sidebar"
       >
         <div className="p-5 border-b border-[#1A4331]/10 flex items-center justify-between">
-          <img src={WC_LOGO} alt="Wilson Contractors" className="h-9 object-contain flex-shrink-0" />
-          <Button variant="ghost" size="sm" onClick={closeSidebar} className="lg:hidden">
-            <X className="w-4 h-4" />
-          </Button>
+          <div className="flex-1" />
+          <img src={WC_LOGO} alt="Wilson Contractors" className="h-9 object-contain" />
+          <div className="flex-1 flex justify-end">
+            <Button variant="ghost" size="sm" onClick={closeSidebar} className="lg:hidden">
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
 
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
