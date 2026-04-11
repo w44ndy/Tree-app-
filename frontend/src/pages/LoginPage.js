@@ -70,13 +70,13 @@ export default function LoginPage() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-[#0A1711] font-medium">Email</Label>
+              <Label htmlFor="email" className="text-[#0A1711] font-medium">Email or Username</Label>
               <Input
                 id="email"
-                type="email"
+                type="text"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@wilsoncontractors.co.uk"
+                placeholder="Email or username"
                 className="h-11 bg-white border-[#1A4331]/15 focus:ring-[#1A4331]/50"
                 data-testid="login-email-input"
                 required

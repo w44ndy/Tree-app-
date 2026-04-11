@@ -103,15 +103,19 @@ class RegisterRequest(BaseModel):
 # ── Auth Endpoints ───────────────────────────────────────────
 @api_router.post("/auth/login")
 async def login(req: LoginRequest, response: Response):
-    email = req.email.strip().lower()
-    user = await db.users.find_one({"email": email})
+    identifier = req.email.strip().lower()
+    # Try email first, then username/name
+    user = await db.users.find_one({"email": identifier})
+    if not user:
+        user = await db.users.find_one({"name": {"$regex": f"^{identifier}$", "$options": "i"}})
     if not user or not verify_password(req.password, user["password_hash"]):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+        raise HTTPException(status_code=401, detail="Invalid email/username or password")
     uid = str(user["_id"])
-    access = create_access_token(uid, email, user.get("role", "viewer"))
+    user_email = user["email"]
+    access = create_access_token(uid, user_email, user.get("role", "viewer"))
     refresh = create_refresh_token(uid)
     set_auth_cookies(response, access, refresh)
-    return {"id": uid, "email": email, "name": user.get("name", ""), "role": user.get("role", "viewer"), "token": access}
+    return {"id": uid, "email": user_email, "name": user.get("name", ""), "role": user.get("role", "viewer"), "token": access}
 
 @api_router.post("/auth/register")
 async def register(req: RegisterRequest, response: Response):
