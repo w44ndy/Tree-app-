@@ -100,6 +100,19 @@ code {
   display: none;
 }
 
+/* Hide Emergent badge */
+[data-testid="made-with-emergent"],
+a[href*="emergent"],
+div[class*="emergent-badge"],
+#made-with-emergent,
+.__emergent_badge,
+div[style*="z-index: 2147483647"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

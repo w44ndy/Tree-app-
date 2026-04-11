@@ -321,8 +321,13 @@ export default function LoadsPage() {
           {manifestData && (
             <div className="mt-4 space-y-4" id="manifest-print">
               <div className="border-b border-[#1A4331]/10 pb-4">
-                <h2 className="text-xl font-bold font-['Outfit'] text-[#0A1711]">Wilson Contractors</h2>
-                <p className="text-sm text-[#4A5D53]">Christmas Tree Delivery Manifest</p>
+                <div className="flex items-center gap-3">
+                  <img src="https://www.wilson-contractors.co.uk/favicon.ico" alt="Wilson Contractors" className="w-10 h-10 rounded-lg" />
+                  <div>
+                    <h2 className="text-xl font-bold font-['Outfit'] text-[#0A1711]">Wilson Contractors</h2>
+                    <p className="text-sm text-[#4A5D53]">Tree Management System — Delivery Manifest</p>
+                  </div>
+                </div>
               </div>
               {manifestData.lorry && (
                 <div className="bg-[#F4F1ED] p-3 rounded-lg">

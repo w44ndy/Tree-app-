@@ -3,7 +3,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { TreePine, Loader2 } from 'lucide-react';
+import { Loader2, TreePine } from 'lucide-react';
+
+const WC_LOGO = "https://www.wilson-contractors.co.uk/favicon.ico";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -37,8 +39,9 @@ export default function LoginPage() {
         />
         <div className="absolute inset-0 bg-gradient-to-r from-[#1A4331]/80 to-[#1A4331]/40" />
         <div className="relative z-10 flex flex-col justify-end p-12 text-white">
+          <img src={WC_LOGO} alt="Wilson Contractors" className="w-16 h-16 rounded-xl mb-4 bg-white/10 p-1" />
           <h1 className="text-4xl font-bold tracking-tight font-['Outfit']">Wilson Contractors</h1>
-          <p className="mt-2 text-lg opacity-90 font-['Work_Sans']">Christmas Tree Management System</p>
+          <p className="mt-2 text-lg opacity-90 font-['Work_Sans']">Tree Management System</p>
           <p className="mt-1 text-sm opacity-70">Mains of Corsindae, Aberdeenshire</p>
         </div>
       </div>
@@ -52,7 +55,7 @@ export default function LoginPage() {
             </div>
             <div>
               <h2 className="text-2xl font-bold text-[#0A1711] font-['Outfit']">Sign In</h2>
-              <p className="text-sm text-[#4A5D53]">Trees.wilson-contractors.co.uk</p>
+              <p className="text-sm text-[#4A5D53]">TMS.wilson-contractors.co.uk</p>
             </div>
           </div>
 
