@@ -295,7 +295,7 @@ export default function LoadsPage() {
           <h1 className="text-3xl font-bold text-[#0A1711] font-['Outfit'] tracking-tight">Collections</h1>
           <p className="text-sm text-[#4A5D53] mt-1">{upcoming.length} upcoming &middot; {dispatched.length} dispatched</p>
         </div>
-        <Dialog open={showCreate} onOpenChange={(open) => { if (!open) { setShowCreate(false); setEditingId(null); setForm({ hauler: '', collection_date: '', destinations: [{ address: '' }], pallets: [{ color: '', quantity: 1 }], notes: '' }); } }}>
+        <Dialog open={showCreate} onOpenChange={(open) => { setShowCreate(open); if (!open) { setEditingId(null); setForm({ hauler: '', collection_date: '', destinations: [{ address: '' }], pallets: [{ color: '', quantity: 1 }], notes: '' }); } }}>
           <DialogTrigger asChild>
             <Button className="bg-[#1A4331] text-white hover:bg-[#1A4331]/90 rounded-lg" data-testid="create-load-button">
               <Plus className="w-4 h-4 mr-2" /> New Collection
